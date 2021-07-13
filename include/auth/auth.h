@@ -3,11 +3,17 @@
 
 #include <stdint.h>
 
+#include "auth/auth.h"
+#include "auth/config.h"
+
 #define AUTH_ID_SIZE		32
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct _HttpReceive;
+struct _HttpRequest;
 
 typedef struct PercepthorAuth {
 
@@ -20,6 +26,11 @@ typedef struct PercepthorAuth {
 	int64_t mask;
 
 } PercepthorAuth;
+
+AUTH_EXPORT unsigned int percepthor_custom_authentication_handler (
+	const struct _HttpReceive *http_receive,
+	const struct _HttpRequest *request
+);
 
 #ifdef __cplusplus
 }
