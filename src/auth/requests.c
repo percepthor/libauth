@@ -7,6 +7,7 @@
 #include <cerver/utils/log.h>
 #endif
 
+#include "auth/auth.h"
 #include "auth/requests.h"
 
 const char *request_result_to_string (const RequestResult type) {
@@ -48,14 +49,55 @@ void auth_request_create (
 
 	// prepare the request
 	(void) snprintf (
-		auth_request->auth_header, AUTH_HEADER_SIZE - 1,
+		auth_request->auth_header, AUTH_HEADER_SIZE,
 		"Authorization: %s", api_key
 	);
 
 	(void) snprintf (
-		auth_request->body, AUTH_REQUEST_SIZE - 1,
+		auth_request->body, AUTH_REQUEST_SIZE,
 		"{ \"service\": \"%s\" }",
 		service_id
+	);
+
+	auth_request->body_len = strlen (auth_request->body);
+
+}
+
+void auth_request_create_single (
+	AuthRequest *auth_request, const char *token,
+	const char *organization, const char *action
+) {
+
+	// prepare the request
+	(void) snprintf (
+		auth_request->auth_header, AUTH_HEADER_SIZE,
+		"Authorization: %s", token
+	);
+
+	(void) snprintf (
+		auth_request->body, AUTH_REQUEST_SIZE,
+		"{ \"type\": \"%d\", \"organization\": \"%s\", \"action\": \"%s\" }",
+		PERCEPTHOR_AUTH_TYPE_SINGLE, organization, action
+	);
+
+	auth_request->body_len = strlen (auth_request->body);
+
+}
+
+void auth_request_create_management (
+	AuthRequest *auth_request, const char *token
+) {
+
+	// prepare the request
+	(void) snprintf (
+		auth_request->auth_header, AUTH_HEADER_SIZE,
+		"Authorization: %s", token
+	);
+
+	(void) snprintf (
+		auth_request->body, AUTH_REQUEST_SIZE,
+		"{ \"type\": \"%d\" }",
+		PERCEPTHOR_AUTH_TYPE_MANAGEMENT
 	);
 
 	auth_request->body_len = strlen (auth_request->body);

@@ -52,6 +52,15 @@ AUTH_PRIVATE void auth_request_create (
 	const char *service_id
 );
 
+AUTH_PRIVATE void auth_request_create_single (
+	AuthRequest *auth_request, const char *token,
+	const char *organization, const char *action
+);
+
+AUTH_PRIVATE void auth_request_create_management (
+	AuthRequest *auth_request, const char *token
+);
+
 AUTH_PUBLIC RequestResult auth_request_authentication (
 	const char *auth_service_address,
 	AuthRequest *auth_request
