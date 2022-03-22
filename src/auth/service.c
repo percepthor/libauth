@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "auth/service.h"
@@ -22,32 +23,57 @@ void auth_service_delete (void *auth_service_ptr) {
 
 AuthService *auth_service_create (
 	const char *service_id,
+	const char *service_name,
 	const char *auth_service_address
 ) {
 
 	AuthService *auth_service = auth_service_new ();
 	if (auth_service) {
-		(void) strncpy (
-			auth_service->service_id,
-			service_id,
-			AUTH_SERVICE_ID_SIZE - 1
-		);
+		if (service_id) {
+			auth_service->service_id_len = snprintf (
+				auth_service->service_id,
+				AUTH_SERVICE_ID_SIZE,
+				"%s", service_id
+			);
+		}
 
-		auth_service->service_id_len = (unsigned int) strlen (
-			auth_service->service_id
-		);
+		if (service_name) {
+			auth_service->service_name_len = snprintf (
+				auth_service->service_name,
+				AUTH_SERVICE_NAME_SIZE,
+				"%s", service_name
+			);
+		}
 
-		(void) strncpy (
-			auth_service->auth_service_address,
-			auth_service_address,
-			AUTH_SERVICE_ADDRESS_SIZE - 1
-		);
-
-		auth_service->auth_service_address_len = (unsigned int) strlen (
-			auth_service->auth_service_address
-		);
+		if (auth_service_address) {
+			auth_service->auth_service_address_len = snprintf (
+				auth_service->auth_service_address,
+				AUTH_SERVICE_ADDRESS_SIZE,
+				"%s", auth_service_address
+			);
+		}
 	}
 
 	return auth_service;
+
+}
+
+void auth_service_print (const AuthService *auth_service) {
+
+	(void) printf ("Auth Service:\n");
+	(void) printf (
+		"\tid [%d]: %s\n",
+		auth_service->service_id_len, auth_service->service_id
+	);
+
+	(void) printf (
+		"\tName [%d]: %s\n",
+		auth_service->service_name_len, auth_service->service_name
+	);
+
+	(void) printf (
+		"\tDescription [%d]: %s\n\n",
+		auth_service->auth_service_address_len, auth_service->auth_service_address
+	);
 
 }

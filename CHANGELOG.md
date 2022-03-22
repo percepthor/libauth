@@ -1,0 +1,4 @@
+- Added base permissions definition & methods
+- Refactored auth service structure to handle name
+- Added ability to create different requests base on type
+- Refactored percepthor auth & added more methods
