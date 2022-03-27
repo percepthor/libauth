@@ -61,19 +61,26 @@ AuthService *auth_service_create (
 void auth_service_print (const AuthService *auth_service) {
 
 	(void) printf ("Auth Service:\n");
-	(void) printf (
-		"\tid [%d]: %s\n",
-		auth_service->service_id_len, auth_service->service_id
-	);
 
-	(void) printf (
-		"\tName [%d]: %s\n",
-		auth_service->service_name_len, auth_service->service_name
-	);
+	if (auth_service->service_id_len) {
+		(void) printf (
+			"\tid [%d]: %s\n",
+			auth_service->service_id_len, auth_service->service_id
+		);
+	}
 
-	(void) printf (
-		"\tDescription [%d]: %s\n\n",
-		auth_service->auth_service_address_len, auth_service->auth_service_address
-	);
+	if (auth_service->service_name_len) {
+		(void) printf (
+			"\tName [%d]: %s\n",
+			auth_service->service_name_len, auth_service->service_name
+		);
+	}
+
+	if (auth_service->auth_service_address_len) {
+		(void) printf (
+			"\tDescription [%d]: %s\n\n",
+			auth_service->auth_service_address_len, auth_service->auth_service_address
+		);
+	}
 
 }
