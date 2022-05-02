@@ -174,6 +174,7 @@ PercepthorAuth *percepthor_auth_create (const PercepthorAuthType type) {
 		switch (percepthor_auth->type) {
 			case PERCEPTHOR_AUTH_TYPE_NONE: break;
 
+			case PERCEPTHOR_AUTH_TYPE_TOKEN: break;
 			case PERCEPTHOR_AUTH_TYPE_ACTION: break;
 			case PERCEPTHOR_AUTH_TYPE_ROLE: break;
 			case PERCEPTHOR_AUTH_TYPE_SERVICE: break;
@@ -543,6 +544,13 @@ unsigned int percepthor_custom_authentication_handler (
 
 		switch (auth_route->auth_type) {
 			case PERCEPTHOR_AUTH_TYPE_NONE: break;
+
+			case PERCEPTHOR_AUTH_TYPE_TOKEN:
+				auth_request_create (&auth_request, token->str);
+
+				// perform request to the auth service and don't handle response
+				retval = auth_request_authentication (auth_service->auth_service_address, &auth_request);
+				break;
 
 			case PERCEPTHOR_AUTH_TYPE_ACTION:
 				auth_request_create_action (&auth_request, token->str, auth_route->action);
