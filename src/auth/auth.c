@@ -16,6 +16,7 @@
 #include "auth/auth.h"
 #include "auth/permissions.h"
 #include "auth/requests.h"
+#include "auth/routes.h"
 #include "auth/service.h"
 
 const char *percepthor_auth_type_to_string (const PercepthorAuthType type) {
@@ -79,19 +80,19 @@ const PercepthorAuthType percepthor_auth_get_type (
 
 }
 
-const char *percepthor_auth_get_organization (
+const PercepthorAuthScope percepthor_auth_get_scope (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->organization;
+	return percepthor_auth->scope;
 
 }
 
-const char *percepthor_auth_get_project (
+const char *percepthor_auth_get_resource (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->project;
+	return percepthor_auth->resource;
 
 }
 
@@ -173,15 +174,18 @@ PercepthorAuth *percepthor_auth_create (const PercepthorAuthType type) {
 		switch (percepthor_auth->type) {
 			case PERCEPTHOR_AUTH_TYPE_NONE: break;
 
-			case PERCEPTHOR_AUTH_TYPE_SINGLE: break;
+			case PERCEPTHOR_AUTH_TYPE_ACTION: break;
+			case PERCEPTHOR_AUTH_TYPE_ROLE: break;
+			case PERCEPTHOR_AUTH_TYPE_SERVICE: break;
 
-			case PERCEPTHOR_AUTH_TYPE_MANAGEMENT:
+			case PERCEPTHOR_AUTH_TYPE_PERMISSIONS:
 				percepthor_auth->permissions = dlist_init (permissions_delete, NULL);
 				break;
+			
+			case PERCEPTHOR_AUTH_TYPE_MULTIPLE: break;
+			case PERCEPTHOR_AUTH_TYPE_COMPLETE: break;
 
-			case PERCEPTHOR_AUTH_TYPE_TOKEN: break;
-
-			default: break;
+			default: break;;
 		}
 	}
 
@@ -190,18 +194,21 @@ PercepthorAuth *percepthor_auth_create (const PercepthorAuthType type) {
 }
 
 static void percepthor_single_authentication_internal (
-	const HttpRequest *request,
-	const char *organization, const char *action
+	const HttpRequest *request, const PermissionsType permissions_type,
+	const char *resource, const char *action
 ) {
 
 	#ifdef PERCEPTHOR_DEBUG
 	cerver_log_success ("Success auth!");
 	#endif
 
-	PercepthorAuth *percepthor_auth = percepthor_auth_create (PERCEPTHOR_AUTH_TYPE_SINGLE);
+	PercepthorAuth *percepthor_auth = percepthor_auth_create (PERCEPTHOR_AUTH_TYPE_PERMISSIONS);
 
-	(void) strncpy (percepthor_auth->organization, organization, AUTH_ORGANIZATION_SIZE - 1);
-	(void) strncpy (percepthor_auth->action, action, AUTH_ACTION_SIZE - 1);
+	percepthor_auth->scope = PERCEPTHOR_AUTH_SCOPE_SINGLE;
+	percepthor_auth->permissions_type = permissions_type;
+
+	(void) snprintf (percepthor_auth->resource, AUTH_RESOURCE_SIZE, "%s", resource);
+	(void) snprintf (percepthor_auth->action, AUTH_ACTION_SIZE, "%s", action);
 
 	http_request_set_custom_data (
 		(HttpRequest *) request, percepthor_auth
@@ -215,7 +222,8 @@ static void percepthor_single_authentication_internal (
 
 unsigned int percepthor_single_authentication (
 	const HttpReceive *http_receive, const HttpRequest *request,
-	const char *organization, const char *action
+	const PermissionsType permissions_type,
+	const char *resource, const char *action
 ) {
 
 	unsigned int retval = 1;
@@ -233,19 +241,17 @@ unsigned int percepthor_single_authentication (
 		);
 
 		AuthRequest auth_request = { 0 };
-		auth_request_create_single (
+		auth_request_create_single_permissions (
 			&auth_request, token->str,
-			organization, action	
+			permissions_type, resource, action	
 		);
 
 		// perform request to auth service
 		if (!auth_request_authentication (
-			auth_service->auth_service_address,
-			&auth_request
+			auth_service->auth_service_address, &auth_request
 		)) {
 			percepthor_single_authentication_internal (
-				request,
-				organization, action
+				request, permissions_type, resource, action
 			);
 
 			retval = 0;
@@ -265,7 +271,7 @@ unsigned int percepthor_single_authentication (
 
 }
 
-static inline void percepthor_management_authentication_parse_single_organization (
+static inline void percepthor_management_authentication_parse_single_resource (
 	Permissions *permissions, json_t *json_object
 ) {
 
@@ -274,10 +280,9 @@ static inline void percepthor_management_authentication_parse_single_organizatio
 	if (json_typeof (json_object) == JSON_OBJECT) {
 		json_object_foreach (json_object, key, value) {
 			if (!strcmp (key, "_id")) {
-				(void) strncpy (
-					permissions->organization,
-					json_string_value (value),
-					AUTH_ORGANIZATION_SIZE - 1
+				(void) snprintf (
+					permissions->resource, AUTH_RESOURCE_SIZE,
+					"%s", json_string_value (value)
 				);
 			}
 
@@ -298,18 +303,18 @@ static inline void percepthor_management_authentication_parse_single_organizatio
 
 }
 
-static inline void percepthor_management_authentication_parse_organizations (
-	PercepthorAuth *percepthor_auth, json_t *organizations_array
+static inline void percepthor_management_authentication_parse_resources (
+	PercepthorAuth *percepthor_auth, json_t *resources_array
 ) {
 
-	size_t n_organizations = json_array_size (organizations_array);
+	size_t n_resources = json_array_size (resources_array);
 	json_t *json_object = NULL;
-	for (size_t i = 0; i < n_organizations; i++) {
-		json_object = json_array_get (organizations_array, i);
+	for (size_t i = 0; i < n_resources; i++) {
+		json_object = json_array_get (resources_array, i);
 		if (json_object) {
 			Permissions *permissions = permissions_create ();
 			if (permissions) {
-				percepthor_management_authentication_parse_single_organization (
+				percepthor_management_authentication_parse_single_resource (
 					permissions, json_object
 				);
 
@@ -332,9 +337,9 @@ static inline void percepthor_management_authentication_parse_json (
 	json_t *value = NULL;
 	if (json_typeof (json_body) == JSON_OBJECT) {
 		json_object_foreach (json_body, key, value) {
-			if (!strcmp (key, "organizations")) {
+			if (!strcmp (key, "resources")) {
 				if (json_typeof (value) == JSON_ARRAY) {
-					percepthor_management_authentication_parse_organizations (
+					percepthor_management_authentication_parse_resources (
 						percepthor_auth, value
 					);
 				}
@@ -377,87 +382,7 @@ static unsigned int percepthor_management_authentication_handle_response (
 
 }
 
-static unsigned int percepthor_management_authentication_internal (
-	const HttpRequest *request, AuthRequest *auth_request
-) {
-
-	unsigned int retval = 1;
-
-	PercepthorAuth *percepthor_auth = percepthor_auth_create (PERCEPTHOR_AUTH_TYPE_MANAGEMENT);
-
-	// get actions mask from response's body
-	if (!percepthor_management_authentication_handle_response (
-		percepthor_auth, auth_request->response
-	)) {
-		#ifdef PERCEPTHOR_DEBUG
-		cerver_log_success ("Success auth!");
-		#endif
-
-		http_request_set_custom_data (
-			(HttpRequest *) request, percepthor_auth
-		);
-
-		http_request_set_delete_custom_data (
-			(HttpRequest *) request, percepthor_auth_delete
-		);
-
-		retval = 0;
-	}
-
-	return retval;
-
-}
-
-unsigned int percepthor_management_authentication (
-	const HttpReceive *http_receive, const HttpRequest *request
-) {
-
-	unsigned int retval = 1;
-
-	// get the token from the request's headers
-	const String *token = http_request_get_header (
-		request, HTTP_HEADER_AUTHORIZATION
-	);
-
-	if (token) {
-		const AuthService *auth_service = (
-			const AuthService *
-		) http_cerver_get_custom_data (
-			http_receive->http_cerver
-		);
-
-		AuthRequest auth_request = { 0 };
-		auth_request_create_management (
-			&auth_request, token->str
-		);
-
-		// perform request to auth service
-		if (!auth_request_authentication (
-			auth_service->auth_service_address,
-			&auth_request
-		)) {
-			percepthor_management_authentication_internal (
-				request, &auth_request
-			);
-
-			retval = 0;
-		}
-	}
-
-	#ifdef PERCEPTHOR_DEBUG
-	else {
-		cerver_log_error (
-			"percepthor_management_authentication () "
-			"Failed to get token from request's \"Authorization\" header!"
-		);
-	}
-	#endif
-
-	return retval;
-
-}
-
-static void percepthor_custom_authentication_parse_json (
+static void percepthor_custom_service_authentication_parse_json (
 	json_t *json_body,
 	const char **mask
 ) {
@@ -477,7 +402,7 @@ static void percepthor_custom_authentication_parse_json (
 
 }
 
-static unsigned int percepthor_custom_authentication_handle_response (
+static unsigned int percepthor_custom_service_authentication_handle_response (
 	PercepthorAuth *percepthor_auth, const char *response
 ) {
 
@@ -488,9 +413,8 @@ static unsigned int percepthor_custom_authentication_handle_response (
 	json_error_t json_error =  { 0 };
 	json_t *json_body = json_loads (response, 0, &json_error);
 	if (json_body) {
-		percepthor_custom_authentication_parse_json (
-			json_body,
-			&mask
+		percepthor_custom_service_authentication_parse_json (
+			json_body, &mask
 		);
 
 		// validate required values
@@ -522,33 +446,73 @@ static unsigned int percepthor_custom_authentication_handle_response (
 
 }
 
-static unsigned int percepthor_custom_authentication_handler_internal (
-	const HttpRequest *request,
-	AuthRequest *auth_request
+static unsigned int percepthor_custom_service_authentication_handler (
+	const HttpRequest *request, const char *auth_service_address, AuthRequest *auth_request
 ) {
 
 	unsigned int retval = 1;
 
-	// TODO: create pool
-	PercepthorAuth *percepthor_auth = (PercepthorAuth *) percepthor_auth_new ();
+	// perform request to the auth service
+	if (!auth_request_authentication (auth_service_address, auth_request)) {
+		// TODO: create pool
+		PercepthorAuth *percepthor_auth = (PercepthorAuth *) percepthor_auth_new ();
 
-	// get actions mask from response's body
-	if (!percepthor_custom_authentication_handle_response (
-		percepthor_auth, auth_request->response
-	)) {
-		#ifdef PERCEPTHOR_DEBUG
-		cerver_log_success ("Success auth!");
-		#endif
+		// get actions mask from response's body
+		if (!percepthor_custom_service_authentication_handle_response (
+			percepthor_auth, auth_request->response
+		)) {
+			#ifdef PERCEPTHOR_DEBUG
+			cerver_log_success ("Success auth!");
+			#endif
 
-		http_request_set_custom_data (
-			(HttpRequest *) request, percepthor_auth
-		);
+			http_request_set_custom_data (
+				(HttpRequest *) request, percepthor_auth
+			);
 
-		http_request_set_delete_custom_data (
-			(HttpRequest *) request, percepthor_auth_delete
-		);
+			http_request_set_delete_custom_data (
+				(HttpRequest *) request, percepthor_auth_delete
+			);
 
-		retval = 0;
+			retval = 0;
+		}
+	}
+
+	return retval;
+
+}
+
+static unsigned int percepthor_custom_permissions_authentication_handler (
+	const HttpRequest *request, const char *auth_service_address,
+	AuthRequest *auth_request, const PermissionsType permissions_type
+) {
+	
+	unsigned int retval = 1;
+
+	// perform request to the auth service
+	if (!auth_request_authentication (auth_service_address, auth_request)) {
+		PercepthorAuth *percepthor_auth = percepthor_auth_create (PERCEPTHOR_AUTH_TYPE_PERMISSIONS);
+
+		percepthor_auth->scope = PERCEPTHOR_AUTH_SCOPE_MANAGEMENT;
+		percepthor_auth->permissions_type = permissions_type;
+
+		// get actions mask from response's body
+		if (!percepthor_management_authentication_handle_response (
+			percepthor_auth, auth_request->response
+		)) {
+			#ifdef PERCEPTHOR_DEBUG
+			cerver_log_success ("Success auth!");
+			#endif
+
+			http_request_set_custom_data (
+				(HttpRequest *) request, percepthor_auth
+			);
+
+			http_request_set_delete_custom_data (
+				(HttpRequest *) request, percepthor_auth_delete
+			);
+
+			retval = 0;
+		}
 	}
 
 	return retval;
@@ -556,41 +520,68 @@ static unsigned int percepthor_custom_authentication_handler_internal (
 }
 
 unsigned int percepthor_custom_authentication_handler (
-	const HttpReceive *http_receive,
-	const HttpRequest *request
+	const HttpReceive *http_receive, const HttpRequest *request
 ) {
 
 	unsigned int retval = 1;
 
 	// get the token from the request's headers
-	const String *api_key = http_request_get_header (
+	const String *token = http_request_get_header (
 		request, HTTP_HEADER_AUTHORIZATION
 	);
 
-	if (api_key) {
+	if (token) {
 		const AuthService *auth_service = (
 			const AuthService *
-		) http_cerver_get_custom_data (
-			http_receive->http_cerver
-		);
+		) http_receive->http_cerver->custom_data;
+
+		const AuthRoute *auth_route = (
+			const AuthRoute *
+		) http_receive->route->custom_data;
 
 		AuthRequest auth_request = { 0 };
-		auth_request_create (
-			&auth_request,
-			api_key->str,
-			auth_service->service_id
-		);
 
-		// perform request to auth service
-		// send token in "Authorization" header
-		// send service's id in requests body
-		if (!auth_request_authentication (
-			auth_service->auth_service_address,
-			&auth_request
-		)) {
-			retval = percepthor_custom_authentication_handler_internal (
-				request, &auth_request
-			);
+		switch (auth_route->auth_type) {
+			case PERCEPTHOR_AUTH_TYPE_NONE: break;
+
+			case PERCEPTHOR_AUTH_TYPE_ACTION:
+				auth_request_create_action (&auth_request, token->str, auth_route->action);
+
+				// perform request to the auth service and don't handle response
+				retval = auth_request_authentication (auth_service->auth_service_address, &auth_request);
+				break;
+
+			case PERCEPTHOR_AUTH_TYPE_ROLE:
+				auth_request_create_role (&auth_request, token->str, auth_route->action, auth_route->role);
+
+				// perform request to the auth service and don't handle response
+				retval = auth_request_authentication (auth_service->auth_service_address, &auth_request);
+				break;
+
+			case PERCEPTHOR_AUTH_TYPE_SERVICE:
+				auth_request_create_service (&auth_request, token->str, auth_service->service_id);
+
+				retval = percepthor_custom_service_authentication_handler (
+					request, auth_service->auth_service_address, &auth_request
+				);
+				break;
+
+			case PERCEPTHOR_AUTH_TYPE_PERMISSIONS:
+				auth_request_create_management_permissions (
+					&auth_request, token->str, auth_route->permissions_type,
+					auth_route->permissions_action_len ? auth_route->permissions_action : NULL
+				);
+
+				retval = percepthor_custom_permissions_authentication_handler (
+					request, auth_service->auth_service_address,
+					&auth_request, auth_route->permissions_type
+				);
+				break;
+			
+			case PERCEPTHOR_AUTH_TYPE_MULTIPLE: break;
+			case PERCEPTHOR_AUTH_TYPE_COMPLETE: break;
+
+			default: break;
 		}
 	}
 
@@ -598,7 +589,7 @@ unsigned int percepthor_custom_authentication_handler (
 	else {
 		cerver_log_error (
 			"percepthor_custom_auth () "
-			"Failed to get API Key from request's \"Authorization\" header!"
+			"Failed to get token from request's \"Authorization\" header!"
 		);
 	}
 	#endif

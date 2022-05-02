@@ -86,11 +86,11 @@ AUTH_EXPORT const PercepthorAuthType percepthor_auth_get_type (
 	const PercepthorAuth *percepthor_auth
 );
 
-AUTH_EXPORT const char *percepthor_auth_get_organization (
+AUTH_EXPORT const PercepthorAuthScope percepthor_auth_get_scope (
 	const PercepthorAuth *percepthor_auth
 );
 
-AUTH_EXPORT const char *percepthor_auth_get_project (
+AUTH_EXPORT const char *percepthor_auth_get_resource (
 	const PercepthorAuth *percepthor_auth
 );
 
@@ -117,12 +117,8 @@ AUTH_PUBLIC PercepthorAuth *percepthor_auth_create (const PercepthorAuthType typ
 AUTH_EXPORT unsigned int percepthor_single_authentication (
 	const struct _HttpReceive *http_receive,
 	const struct _HttpRequest *request,
-	const char *organization, const char *action
-);
-
-AUTH_EXPORT unsigned int percepthor_management_authentication (
-	const struct _HttpReceive *http_receive,
-	const struct _HttpRequest *request
+	const PermissionsType permissions_type,
+	const char *resource, const char *action
 );
 
 AUTH_EXPORT unsigned int percepthor_custom_authentication_handler (
