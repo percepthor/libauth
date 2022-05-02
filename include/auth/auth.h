@@ -7,11 +7,8 @@
 #include <cerver/collections/dlist.h>
 
 #include "auth/config.h"
-
-#define AUTH_ID_SIZE				32
-#define AUTH_ORGANIZATION_SIZE		128
-#define AUTH_PROJECT_SIZE			128
-#define AUTH_ACTION_SIZE			256
+#include "auth/permissions.h"
+#include "auth/types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,11 +19,14 @@ struct _HttpRequest;
 
 struct _Permissions;
 
-#define PERCEPTHOR_AUTH_TYPE_MAP(XX)			\
-	XX(0,  NONE,      	None)			\
-	XX(1,  SINGLE,      Single)			\
-	XX(2,  MANAGEMENT,  Management)		\
-	XX(3,  TOKEN,		Token)
+#define PERCEPTHOR_AUTH_TYPE_MAP(XX)		\
+	XX(0,  NONE,      		None)			\
+	XX(1,  ACTION,      	Action)			\
+	XX(2,  ROLE,  			Role)			\
+	XX(3,  SERVICE,			Service)		\
+	XX(4,  PERMISSIONS,		Permissions)	\
+	XX(5,  MULTIPLE,		Multiple)		\
+	XX(6,  COMPLETE,		Complete)
 
 typedef enum PercepthorAuthType {
 
