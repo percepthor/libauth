@@ -25,6 +25,17 @@ void auth_route_delete (void *auth_route_ptr) {
 
 }
 
+AuthRoute *auth_route_create (void) {
+
+	AuthRoute *auth_route = auth_route_new ();
+	if (auth_route) {
+		auth_route->auth_type = PERCEPTHOR_AUTH_TYPE_TOKEN;
+	}
+
+	return auth_route;
+
+}
+
 AuthRoute *auth_route_create_action (const char *action) {
 
 	AuthRoute *auth_route = auth_route_new ();

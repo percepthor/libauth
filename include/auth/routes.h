@@ -33,6 +33,8 @@ typedef struct AuthRoute {
 
 AUTH_EXPORT void auth_route_delete (void *auth_route_ptr);
 
+AUTH_EXPORT AuthRoute *auth_route_create (void);
+
 AUTH_EXPORT AuthRoute *auth_route_create_action (const char *action);
 
 AUTH_EXPORT AuthRoute *auth_route_create_role (
