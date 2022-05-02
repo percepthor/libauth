@@ -42,6 +42,26 @@ void auth_request_delete (void *request_ptr) {
 
 }
 
+void auth_request_create (
+	AuthRequest *auth_request, const char *token
+) {
+
+	// prepare the request
+	(void) snprintf (
+		auth_request->auth_header, AUTH_HEADER_SIZE,
+		"Authorization: %s", token
+	);
+
+	(void) snprintf (
+		auth_request->body, AUTH_REQUEST_SIZE,
+		"{ \"type\": %d }",
+		PERCEPTHOR_AUTH_TYPE_TOKEN
+	);
+
+	auth_request->body_len = strlen (auth_request->body);
+
+}
+
 void auth_request_create_action (
 	AuthRequest *auth_request, const char *token, const char *action
 ) {
