@@ -30,6 +30,18 @@ const char *percepthor_auth_type_to_string (const PercepthorAuthType type) {
 
 }
 
+const char *percepthor_auth_scope_to_string (const PercepthorAuthScope scope) {
+
+	switch (scope) {
+		#define XX(num, name, string) case PERCEPTHOR_AUTH_SCOPE_##name: return #string;
+		PERCEPTHOR_AUTH_SCOPE_MAP(XX)
+		#undef XX
+	}
+
+	return percepthor_auth_scope_to_string (PERCEPTHOR_AUTH_SCOPE_NONE);
+
+}
+
 static PercepthorAuth *percepthor_auth_new (void) {
 
 	PercepthorAuth *auth = (PercepthorAuth *) malloc (sizeof (PercepthorAuth));
@@ -37,6 +49,7 @@ static PercepthorAuth *percepthor_auth_new (void) {
 		(void) memset (auth, 0, sizeof (PercepthorAuth));
 
 		auth->type = PERCEPTHOR_AUTH_TYPE_NONE;
+		auth->scope = PERCEPTHOR_AUTH_SCOPE_NONE;
 
 		auth->permissions = NULL;
 		auth->next_permissions = NULL;

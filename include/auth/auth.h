@@ -40,14 +40,32 @@ AUTH_PUBLIC const char *percepthor_auth_type_to_string (
 	const PercepthorAuthType type
 );
 
+#define PERCEPTHOR_AUTH_SCOPE_MAP(XX)	\
+	XX(0,  NONE,      	None)			\
+	XX(1,  SINGLE,      Single)			\
+	XX(2,  MANAGEMENT,  Management)
+
+typedef enum PercepthorAuthScope {
+
+	#define XX(num, name, string) PERCEPTHOR_AUTH_SCOPE_##name = num,
+	PERCEPTHOR_AUTH_SCOPE_MAP(XX)
+	#undef XX
+
+} PercepthorAuthScope;
+
+AUTH_PUBLIC const char *percepthor_auth_scope_to_string (
+	const PercepthorAuthScope scope
+);
+
 typedef struct PercepthorAuth {
 
 	PercepthorAuthType type;
+	PercepthorAuthScope scope;
 
-	char service_id[AUTH_ID_SIZE];
+	char service[AUTH_ID_SIZE];
 
-	char organization[AUTH_ORGANIZATION_SIZE];
-	char project[AUTH_PROJECT_SIZE];
+	PermissionsType permissions_type;
+	char resource[AUTH_RESOURCE_SIZE];
 	char action[AUTH_ACTION_SIZE];
 
 	bool super_admin;
