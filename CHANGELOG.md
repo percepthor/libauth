@@ -1,1 +1,8 @@
-- Added extra check sin auth service print method
+- Moved common definitions to dedicated header
+- Added base auth route structure definition & methods
+- Updated dedicated percepthor auth types definitions
+- Added custom auth types requests create methods
+- Added base dedicated permissions types definitions
+- Replaced permissions organization with resource
+- Added dedicated percepthor auth scope definitions
+- Refactored custom authentication handlers methods
