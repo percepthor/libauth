@@ -42,7 +42,7 @@ static Permissions *permissions_new (void) {
 
 	Permissions *permissions = (Permissions *) malloc (sizeof (Permissions));
 	if (permissions) {
-		(void) memset (permissions->organization, 0, AUTH_ORGANIZATION_SIZE);
+		(void) memset (permissions->resource, 0, AUTH_RESOURCE_SIZE);
 
 		permissions->actions = NULL;
 	}
@@ -63,9 +63,9 @@ void permissions_delete (void *permissions_ptr) {
 
 }
 
-const char *permissions_get_organization (const Permissions *permissions) {
+const char *permissions_get_resource (const Permissions *permissions) {
 
-	return permissions->organization;
+	return permissions->resource;
 
 }
 
@@ -83,7 +83,7 @@ Permissions *permissions_create (void) {
 void permissions_print (const Permissions *permissions) {
 
 	if (permissions) {
-		(void) printf ("Organization: %s\n", permissions->organization);
+		(void) printf ("Resource: %s\n", permissions->resource);
 
 		(void) printf ("Actions: %lu\n", permissions->actions->size);
 

@@ -43,7 +43,7 @@ AUTH_PRIVATE void permissions_action_delete (void *permissions_action_ptr);
 
 struct _Permissions {
 
-	char organization[AUTH_ORGANIZATION_SIZE];
+	char resource[AUTH_RESOURCE_SIZE];
 
 	DoubleList *actions;
 
@@ -53,7 +53,7 @@ typedef struct _Permissions Permissions;
 
 AUTH_PRIVATE void permissions_delete (void *permissions_ptr);
 
-AUTH_EXPORT const char *permissions_get_organization (
+AUTH_EXPORT const char *permissions_get_resource (
 	const Permissions *permissions
 );
 
