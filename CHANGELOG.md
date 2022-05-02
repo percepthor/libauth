@@ -1,8 +1,5 @@
-- Moved common definitions to dedicated header
-- Added base auth route structure definition & methods
-- Updated dedicated percepthor auth types definitions
-- Added custom auth types requests create methods
-- Added base dedicated permissions types definitions
-- Replaced permissions organization with resource
-- Added dedicated percepthor auth scope definitions
-- Refactored custom authentication handlers methods
+- Added dedicated percepthor auth token type definition
+- Added method to create default auth route instance
+- Added dedicated auth token type request create method
+- Refactored how requests integers values are handled
+- Updated custom handler to use latest auth token type

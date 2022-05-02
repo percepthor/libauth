@@ -49,9 +49,7 @@ AUTH_PRIVATE void *auth_request_new (void);
 AUTH_PRIVATE void auth_request_delete (void *request_ptr);
 
 AUTH_PRIVATE void auth_request_create (
-	AuthRequest *auth_request,
-	const char *api_key,
-	const char *service_id
+	AuthRequest *auth_request, const char *token
 );
 
 AUTH_PRIVATE void auth_request_create_action (

@@ -21,12 +21,13 @@ struct _Permissions;
 
 #define PERCEPTHOR_AUTH_TYPE_MAP(XX)		\
 	XX(0,  NONE,      		None)			\
-	XX(1,  ACTION,      	Action)			\
-	XX(2,  ROLE,  			Role)			\
-	XX(3,  SERVICE,			Service)		\
-	XX(4,  PERMISSIONS,		Permissions)	\
-	XX(5,  MULTIPLE,		Multiple)		\
-	XX(6,  COMPLETE,		Complete)
+	XX(1,  TOKEN,      		Token)			\
+	XX(2,  ACTION,      	Action)			\
+	XX(3,  ROLE,  			Role)			\
+	XX(4,  SERVICE,			Service)		\
+	XX(5,  PERMISSIONS,		Permissions)	\
+	XX(6,  MULTIPLE,		Multiple)		\
+	XX(7,  COMPLETE,		Complete)
 
 typedef enum PercepthorAuthType {
 

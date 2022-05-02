@@ -42,6 +42,26 @@ void auth_request_delete (void *request_ptr) {
 
 }
 
+void auth_request_create (
+	AuthRequest *auth_request, const char *token
+) {
+
+	// prepare the request
+	(void) snprintf (
+		auth_request->auth_header, AUTH_HEADER_SIZE,
+		"Authorization: %s", token
+	);
+
+	(void) snprintf (
+		auth_request->body, AUTH_REQUEST_SIZE,
+		"{ \"type\": %d }",
+		PERCEPTHOR_AUTH_TYPE_TOKEN
+	);
+
+	auth_request->body_len = strlen (auth_request->body);
+
+}
+
 void auth_request_create_action (
 	AuthRequest *auth_request, const char *token, const char *action
 ) {
@@ -54,7 +74,7 @@ void auth_request_create_action (
 
 	(void) snprintf (
 		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": \"%d\", \"action\": \"%s\" }",
+		"{ \"type\": %d, \"action\": \"%s\" }",
 		PERCEPTHOR_AUTH_TYPE_ACTION, action
 	);
 
@@ -76,7 +96,7 @@ void auth_request_create_role (
 	if (action && role) {
 		(void) snprintf (
 			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": \"%d\", \"action\": \"%s\", \"role\": \"%s\" }",
+			"{ \"type\": %d, \"action\": \"%s\", \"role\": \"%s\" }",
 			PERCEPTHOR_AUTH_TYPE_ROLE, action, role
 		);
 	}
@@ -84,7 +104,7 @@ void auth_request_create_role (
 	else {
 		(void) snprintf (
 			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": \"%d\", \"action\": None, \"role\": \"%s\" }",
+			"{ \"type\": %d, \"action\": None, \"role\": \"%s\" }",
 			PERCEPTHOR_AUTH_TYPE_ROLE, role
 		);
 	}
@@ -105,7 +125,7 @@ void auth_request_create_service (
 
 	(void) snprintf (
 		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": \"%d\", \"service\": \"%s\" }",
+		"{ \"type\": %d, \"service\": \"%s\" }",
 		PERCEPTHOR_AUTH_TYPE_SERVICE, service
 	);
 
@@ -127,7 +147,7 @@ void auth_request_create_single_permissions (
 
 	(void) snprintf (
 		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": \"%d\", \"scope\": \"%d\", \"permissions_type\": \"%u\", \"resource\": \"%s\", \"action\": \"%s\" }",
+		"{ \"type\": %d, \"scope\": %d, \"permissions_type\": %u, \"resource\": \"%s\", \"action\": \"%s\" }",
 		PERCEPTHOR_AUTH_TYPE_PERMISSIONS, PERCEPTHOR_AUTH_SCOPE_SINGLE, permissions_type,
 		resource, permissions_action
 	);
@@ -151,7 +171,7 @@ void auth_request_create_management_permissions (
 	if (permissions_action) {
 		(void) snprintf (
 			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": \"%d\", \"scope\": \"%d\", \"permissions_type\": \"%u\", \"action\": \"%s\" }",
+			"{ \"type\": %d, \"scope\": %d, \"permissions_type\": %u, \"action\": \"%s\" }",
 			PERCEPTHOR_AUTH_TYPE_PERMISSIONS, PERCEPTHOR_AUTH_SCOPE_MANAGEMENT, permissions_type,
 			permissions_action
 		);
@@ -160,7 +180,7 @@ void auth_request_create_management_permissions (
 	else {
 		(void) snprintf (
 			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": \"%d\", \"scope\": \"%d\", \"permissions_type\": \"%u\" }",
+			"{ \"type\": %d, \"scope\": %d, \"permissions_type\": %u }",
 			PERCEPTHOR_AUTH_TYPE_PERMISSIONS, PERCEPTHOR_AUTH_SCOPE_MANAGEMENT, permissions_type
 		);
 	}
