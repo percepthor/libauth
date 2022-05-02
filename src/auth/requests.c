@@ -8,6 +8,7 @@
 #endif
 
 #include "auth/auth.h"
+#include "auth/permissions.h"
 #include "auth/requests.h"
 
 const char *request_result_to_string (const RequestResult type) {
@@ -41,31 +42,59 @@ void auth_request_delete (void *request_ptr) {
 
 }
 
-void auth_request_create (
-	AuthRequest *auth_request,
-	const char *api_key,
-	const char *service_id
+void auth_request_create_action (
+	AuthRequest *auth_request, const char *token, const char *action
 ) {
 
 	// prepare the request
 	(void) snprintf (
 		auth_request->auth_header, AUTH_HEADER_SIZE,
-		"Authorization: %s", api_key
+		"Authorization: %s", token
 	);
 
 	(void) snprintf (
 		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"service\": \"%s\" }",
-		service_id
+		"{ \"type\": \"%d\", \"action\": \"%s\" }",
+		PERCEPTHOR_AUTH_TYPE_ACTION, action
 	);
 
 	auth_request->body_len = strlen (auth_request->body);
 
 }
 
-void auth_request_create_single (
+void auth_request_create_role (
 	AuthRequest *auth_request, const char *token,
-	const char *organization, const char *action
+	const char *action, const char *role
+) {
+
+	// prepare the request
+	(void) snprintf (
+		auth_request->auth_header, AUTH_HEADER_SIZE,
+		"Authorization: %s", token
+	);
+
+	if (action && role) {
+		(void) snprintf (
+			auth_request->body, AUTH_REQUEST_SIZE,
+			"{ \"type\": \"%d\", \"action\": \"%s\", \"role\": \"%s\" }",
+			PERCEPTHOR_AUTH_TYPE_ROLE, action, role
+		);
+	}
+
+	else {
+		(void) snprintf (
+			auth_request->body, AUTH_REQUEST_SIZE,
+			"{ \"type\": \"%d\", \"action\": None, \"role\": \"%s\" }",
+			PERCEPTHOR_AUTH_TYPE_ROLE, role
+		);
+	}
+
+	auth_request->body_len = strlen (auth_request->body);
+
+}
+
+void auth_request_create_service (
+	AuthRequest *auth_request, const char *token, const char *service
 ) {
 
 	// prepare the request
@@ -76,18 +105,20 @@ void auth_request_create_single (
 
 	(void) snprintf (
 		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": \"%d\", \"organization\": \"%s\", \"action\": \"%s\" }",
-		PERCEPTHOR_AUTH_TYPE_SINGLE, organization, action
+		"{ \"type\": \"%d\", \"service\": \"%s\" }",
+		PERCEPTHOR_AUTH_TYPE_SERVICE, service
 	);
 
 	auth_request->body_len = strlen (auth_request->body);
 
 }
 
-void auth_request_create_management (
-	AuthRequest *auth_request, const char *token
+void auth_request_create_single_permissions (
+	AuthRequest *auth_request, const char *token,
+	const PermissionsType permissions_type,
+	const char *resource, const char *permissions_action
 ) {
-
+	
 	// prepare the request
 	(void) snprintf (
 		auth_request->auth_header, AUTH_HEADER_SIZE,
@@ -96,9 +127,43 @@ void auth_request_create_management (
 
 	(void) snprintf (
 		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": \"%d\" }",
-		PERCEPTHOR_AUTH_TYPE_MANAGEMENT
+		"{ \"type\": \"%d\", \"scope\": \"%d\", \"permissions_type\": \"%u\", \"resource\": \"%s\", \"action\": \"%s\" }",
+		PERCEPTHOR_AUTH_TYPE_PERMISSIONS, PERCEPTHOR_AUTH_SCOPE_SINGLE, permissions_type,
+		resource, permissions_action
 	);
+
+	auth_request->body_len = strlen (auth_request->body);
+
+}
+
+void auth_request_create_management_permissions (
+	AuthRequest *auth_request, const char *token,
+	const PermissionsType permissions_type,
+	const char *permissions_action
+) {
+
+	// prepare the request
+	(void) snprintf (
+		auth_request->auth_header, AUTH_HEADER_SIZE,
+		"Authorization: %s", token
+	);
+
+	if (permissions_action) {
+		(void) snprintf (
+			auth_request->body, AUTH_REQUEST_SIZE,
+			"{ \"type\": \"%d\", \"scope\": \"%d\", \"permissions_type\": \"%u\", \"action\": \"%s\" }",
+			PERCEPTHOR_AUTH_TYPE_PERMISSIONS, PERCEPTHOR_AUTH_SCOPE_MANAGEMENT, permissions_type,
+			permissions_action
+		);
+	}
+
+	else {
+		(void) snprintf (
+			auth_request->body, AUTH_REQUEST_SIZE,
+			"{ \"type\": \"%d\", \"scope\": \"%d\", \"permissions_type\": \"%u\" }",
+			PERCEPTHOR_AUTH_TYPE_PERMISSIONS, PERCEPTHOR_AUTH_SCOPE_MANAGEMENT, permissions_type
+		);
+	}
 
 	auth_request->body_len = strlen (auth_request->body);
 

@@ -3,11 +3,13 @@
 
 #include <stddef.h>
 
+#include "auth/auth.h"
 #include "auth/config.h"
+#include "auth/permissions.h"
 
 #define AUTH_HEADER_SIZE		1024
 #define AUTH_REQUEST_SIZE		512
-#define AUTH_RESPONSE_SIZE		512
+#define AUTH_RESPONSE_SIZE		1024
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,13 +54,29 @@ AUTH_PRIVATE void auth_request_create (
 	const char *service_id
 );
 
-AUTH_PRIVATE void auth_request_create_single (
-	AuthRequest *auth_request, const char *token,
-	const char *organization, const char *action
+AUTH_PRIVATE void auth_request_create_action (
+	AuthRequest *auth_request, const char *token, const char *action
 );
 
-AUTH_PRIVATE void auth_request_create_management (
-	AuthRequest *auth_request, const char *token
+AUTH_PRIVATE void auth_request_create_role (
+	AuthRequest *auth_request, const char *token,
+	const char *action, const char *role
+);
+
+AUTH_PRIVATE void auth_request_create_service (
+	AuthRequest *auth_request, const char *token, const char *service
+);
+
+AUTH_PRIVATE void auth_request_create_single_permissions (
+	AuthRequest *auth_request, const char *token,
+	const PermissionsType permissions_type,
+	const char *resource, const char *permissions_action
+);
+
+AUTH_PRIVATE void auth_request_create_management_permissions (
+	AuthRequest *auth_request, const char *token,
+	const PermissionsType permissions_type,
+	const char *permissions_action
 );
 
 AUTH_PUBLIC RequestResult auth_request_authentication (
