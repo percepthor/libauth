@@ -6,6 +6,18 @@
 #include "auth/auth.h"
 #include "auth/permissions.h"
 
+const char *permissions_type_to_string (const PermissionsType type) {
+
+	switch (type) {
+		#define XX(num, name, string) case PERMISSIONS_TYPE_##name: return #string;
+		PERMISSIONS_TYPE_MAP(XX)
+		#undef XX
+	}
+
+	return permissions_type_to_string (PERMISSIONS_TYPE_NONE);
+
+}
+
 PermissionsAction *permissions_action_create (const char *action) {
 
 	PermissionsAction *permissions_action = (PermissionsAction *) malloc (sizeof (PermissionsAction));

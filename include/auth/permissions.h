@@ -5,12 +5,30 @@
 
 #include <cerver/collections/dlist.h>
 
-#include "auth/auth.h"
 #include "auth/config.h"
+#include "auth/types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define PERMISSIONS_TYPE_MAP(XX)		\
+	XX(0,  NONE,			None)			\
+	XX(1,  SERVICE,			Service)		\
+	XX(2,  ORGANIZATION,	Organization)	\
+	XX(3,  PROJECT,			Project)
+
+typedef enum PermissionsType {
+
+	#define XX(num, name, string) PERMISSIONS_TYPE_##name = num,
+	PERMISSIONS_TYPE_MAP(XX)
+	#undef XX
+
+} PermissionsType;
+
+AUTH_PUBLIC const char *permissions_type_to_string (
+	const PermissionsType scope
+);
 
 typedef struct PermissionsAction {
 
