@@ -47,6 +47,8 @@ typedef struct AuthToken {
 
 } AuthToken;
 
+AUTH_PUBLIC void percepthor_token_print (const AuthToken *auth_token);
+
 #ifdef __cplusplus
 }
 #endif
