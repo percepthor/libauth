@@ -8,6 +8,7 @@
 
 #include "auth/config.h"
 #include "auth/permissions.h"
+#include "auth/token.h"
 #include "auth/types.h"
 
 #ifdef __cplusplus
@@ -74,8 +75,7 @@ typedef struct PercepthorAuth {
 	DoubleList *permissions;
 	ListElement *next_permissions;
 
-	char token[AUTH_ID_SIZE];
-	char user[AUTH_ID_SIZE];
+	AuthToken token;
 
 	int64_t mask;
 
