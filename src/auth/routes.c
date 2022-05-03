@@ -113,7 +113,7 @@ AuthRoute *auth_route_create_permissions (
 void auth_route_print (const AuthRoute *auth_route) {
 
 	if (auth_route) {
-		(void) printf ("Auth Service:\n");
+		(void) printf ("Auth Route:\n");
 
 		(void) printf (
 			"\ttype: %s\n", percepthor_auth_type_to_string (auth_route->auth_type)
