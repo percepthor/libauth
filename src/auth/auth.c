@@ -20,6 +20,10 @@
 #include "auth/service.h"
 #include "auth/token.h"
 
+static unsigned int percepthor_custom_authentication_handle_response (
+	PercepthorAuth *percepthor_auth, const char *response
+);
+
 const char *percepthor_auth_type_to_string (const PercepthorAuthType type) {
 
 	switch (type) {
@@ -316,13 +320,9 @@ static inline void percepthor_custom_authentication_parse_token (
 }
 
 static void percepthor_single_authentication_internal (
-	const HttpRequest *request, const PermissionsType permissions_type,
-	const char *resource, const char *action
+	const HttpRequest *request, AuthRequest *auth_request,
+	const PermissionsType permissions_type, const char *resource, const char *action
 ) {
-
-	#ifdef PERCEPTHOR_DEBUG
-	cerver_log_success ("Success auth!");
-	#endif
 
 	PercepthorAuth *percepthor_auth = percepthor_auth_create (PERCEPTHOR_AUTH_TYPE_PERMISSIONS);
 
@@ -332,13 +332,22 @@ static void percepthor_single_authentication_internal (
 	(void) snprintf (percepthor_auth->resource, AUTH_RESOURCE_SIZE, "%s", resource);
 	(void) snprintf (percepthor_auth->action, AUTH_ACTION_SIZE, "%s", action);
 
-	http_request_set_custom_data (
-		(HttpRequest *) request, percepthor_auth
-	);
+	// get token values from response's body
+	if (!percepthor_custom_authentication_handle_response (
+		percepthor_auth, auth_request->response
+	)) {
+		#ifdef PERCEPTHOR_DEBUG
+		cerver_log_success ("Success auth!");
+		#endif
 
-	http_request_set_delete_custom_data (
-		(HttpRequest *) request, percepthor_auth_delete
-	);
+		http_request_set_custom_data (
+			(HttpRequest *) request, percepthor_auth
+		);
+
+		http_request_set_delete_custom_data (
+			(HttpRequest *) request, percepthor_auth_delete
+		);
+	}
 
 }
 
@@ -358,9 +367,7 @@ unsigned int percepthor_single_authentication (
 	if (token) {
 		const AuthService *auth_service = (
 			const AuthService *
-		) http_cerver_get_custom_data (
-			http_receive->http_cerver
-		);
+		) http_receive->http_cerver->custom_data;
 
 		AuthRequest auth_request = { 0 };
 		auth_request_create_single_permissions (
@@ -373,7 +380,7 @@ unsigned int percepthor_single_authentication (
 			auth_service->auth_service_address, &auth_request
 		)) {
 			percepthor_single_authentication_internal (
-				request, permissions_type, resource, action
+				request, &auth_request, permissions_type, resource, action
 			);
 
 			retval = 0;
