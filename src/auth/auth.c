@@ -477,6 +477,98 @@ static unsigned int percepthor_custom_internal_authentication_handler (
 
 }
 
+static void percepthor_custom_service_authentication_parse_json (
+	PercepthorAuth *percepthor_auth, json_t *json_body
+) {
+
+	const char *key = NULL;
+	json_t *value = NULL;
+	if (json_typeof (json_body) == JSON_OBJECT) {
+		json_object_foreach (json_body, key, value) {
+			if (!strcmp (key, "token")) {
+				if (json_typeof (value) == JSON_OBJECT) {
+					percepthor_custom_authentication_parse_token (
+						&percepthor_auth->token, value
+					);
+				}
+			}
+
+			else if (!strcmp (key, "mask")) {
+				percepthor_auth->mask = (int64_t) atoll (json_string_value (value));
+				#ifdef PERCEPTHOR_DEBUG
+				(void) printf ("mask: %ld\n", percepthor_auth->mask);
+				#endif
+			}
+		}
+	}
+
+}
+
+static unsigned int percepthor_custom_service_authentication_handle_response (
+	PercepthorAuth *percepthor_auth, const char *response
+) {
+
+	unsigned int retval = 1;
+
+	json_error_t json_error =  { 0 };
+	json_t *json_body = json_loads (response, 0, &json_error);
+	if (json_body) {
+		percepthor_custom_service_authentication_parse_json (
+			percepthor_auth, json_body
+		);
+
+		json_decref (json_body);
+
+		retval = 0;
+	}
+
+	#ifdef PERCEPTHOR_DEBUG
+	else {
+		cerver_log_error (
+			"percepthor_custom_service_authentication_handle_response () - json error on line %d: %s\n",
+			json_error.line, json_error.text
+		);
+	}
+	#endif
+
+	return retval;
+
+}
+
+static unsigned int percepthor_custom_service_authentication_handler (
+	const HttpRequest *request, const char *auth_service_address, AuthRequest *auth_request
+) {
+
+	unsigned int retval = 1;
+
+	// perform request to the auth service
+	if (!auth_request_authentication (auth_service_address, auth_request)) {
+		PercepthorAuth *percepthor_auth = (PercepthorAuth *) percepthor_auth_new ();
+
+		// get actions mask from response's body
+		if (!percepthor_custom_service_authentication_handle_response (
+			percepthor_auth, auth_request->response
+		)) {
+			#ifdef PERCEPTHOR_DEBUG
+			cerver_log_success ("Success auth!");
+			#endif
+
+			http_request_set_custom_data (
+				(HttpRequest *) request, percepthor_auth
+			);
+
+			http_request_set_delete_custom_data (
+				(HttpRequest *) request, percepthor_auth_delete
+			);
+
+			retval = 0;
+		}
+	}
+
+	return retval;
+
+}
+
 static inline void percepthor_management_authentication_parse_single_resource (
 	Permissions *permissions, json_t *json_object
 ) {
@@ -543,7 +635,15 @@ static inline void percepthor_management_authentication_parse_json (
 	json_t *value = NULL;
 	if (json_typeof (json_body) == JSON_OBJECT) {
 		json_object_foreach (json_body, key, value) {
-			if (!strcmp (key, "resources")) {
+			if (!strcmp (key, "token")) {
+				if (json_typeof (value) == JSON_OBJECT) {
+					percepthor_custom_authentication_parse_token (
+						&percepthor_auth->token, value
+					);
+				}
+			}
+
+			else if (!strcmp (key, "resources")) {
 				if (json_typeof (value) == JSON_ARRAY) {
 					percepthor_management_authentication_parse_resources (
 						percepthor_auth, value
@@ -583,91 +683,6 @@ static unsigned int percepthor_management_authentication_handle_response (
 		);
 	}
 	#endif
-
-	return retval;
-
-}
-
-static void percepthor_custom_service_authentication_parse_json (
-	PercepthorAuth *percepthor_auth, json_t *json_body
-) {
-
-	const char *key = NULL;
-	json_t *value = NULL;
-	if (json_typeof (json_body) == JSON_OBJECT) {
-		json_object_foreach (json_body, key, value) {
-			if (!strcmp (key, "mask")) {
-				percepthor_auth->mask = (int64_t) atoll (json_string_value (value));
-				#ifdef PERCEPTHOR_DEBUG
-				(void) printf ("mask: %ld\n", percepthor_auth->mask);
-				#endif
-			}
-		}
-	}
-
-}
-
-static unsigned int percepthor_custom_service_authentication_handle_response (
-	PercepthorAuth *percepthor_auth, const char *response
-) {
-
-	unsigned int retval = 1;
-
-	json_error_t json_error =  { 0 };
-	json_t *json_body = json_loads (response, 0, &json_error);
-	if (json_body) {
-		percepthor_custom_service_authentication_parse_json (
-			percepthor_auth, json_body
-		);
-
-		json_decref (json_body);
-
-		retval = 0;
-	}
-
-	#ifdef PERCEPTHOR_DEBUG
-	else {
-		cerver_log_error (
-			"percepthor_custom_service_authentication_handle_response () - json error on line %d: %s\n",
-			json_error.line, json_error.text
-		);
-	}
-	#endif
-
-	return retval;
-
-}
-
-static unsigned int percepthor_custom_service_authentication_handler (
-	const HttpRequest *request, const char *auth_service_address, AuthRequest *auth_request
-) {
-
-	unsigned int retval = 1;
-
-	// perform request to the auth service
-	if (!auth_request_authentication (auth_service_address, auth_request)) {
-		// TODO: create pool
-		PercepthorAuth *percepthor_auth = (PercepthorAuth *) percepthor_auth_new ();
-
-		// get actions mask from response's body
-		if (!percepthor_custom_service_authentication_handle_response (
-			percepthor_auth, auth_request->response
-		)) {
-			#ifdef PERCEPTHOR_DEBUG
-			cerver_log_success ("Success auth!");
-			#endif
-
-			http_request_set_custom_data (
-				(HttpRequest *) request, percepthor_auth
-			);
-
-			http_request_set_delete_custom_data (
-				(HttpRequest *) request, percepthor_auth_delete
-			);
-
-			retval = 0;
-		}
-	}
 
 	return retval;
 
