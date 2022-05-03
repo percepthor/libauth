@@ -1,5 +1,6 @@
-- Added dedicated percepthor auth token type definition
-- Added method to create default auth route instance
-- Added dedicated auth token type request create method
-- Refactored how requests integers values are handled
-- Updated custom handler to use latest auth token type
+- Added base percepthor auth token structure definition
+- Added dedicated token structure inside percepthor auth
+- Added methods to get percepthor auth token values
+- Handling token values in custom authentication responses
+- Added dedicated method to print percepthor auth token
+- Handling token in percepthor single authentication
