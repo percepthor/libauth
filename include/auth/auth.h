@@ -145,7 +145,13 @@ AUTH_EXPORT const int64_t percepthor_auth_get_mask (
 	const PercepthorAuth *percepthor_auth
 );
 
-AUTH_PUBLIC PercepthorAuth *percepthor_auth_create (const PercepthorAuthType type);
+AUTH_PUBLIC PercepthorAuth *percepthor_auth_create (
+	const PercepthorAuthType type
+);
+
+AUTH_EXPORT void percepthor_auth_print_token (
+	const PercepthorAuth *percepthor_auth
+);
 
 AUTH_EXPORT unsigned int percepthor_single_authentication (
 	const struct _HttpReceive *http_receive,
