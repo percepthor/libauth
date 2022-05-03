@@ -18,6 +18,7 @@
 #include "auth/requests.h"
 #include "auth/routes.h"
 #include "auth/service.h"
+#include "auth/token.h"
 
 const char *percepthor_auth_type_to_string (const PercepthorAuthType type) {
 
@@ -165,6 +166,70 @@ const Permissions *percepthor_auth_permissions_iter_get_next (
 
 }
 
+const char *percepthor_auth_get_token_id (
+	const PercepthorAuth *percepthor_auth
+) {
+
+	return percepthor_auth->token.id;
+
+}
+
+const PercepthorTokenType percepthor_auth_get_token_type (
+	const PercepthorAuth *percepthor_auth
+) {
+
+	return percepthor_auth->token.type;
+
+}
+
+const char *percepthor_auth_get_token_organization (
+	const PercepthorAuth *percepthor_auth
+) {
+
+	return percepthor_auth->token.organization;
+
+}
+
+const char *percepthor_auth_get_token_permissions (
+	const PercepthorAuth *percepthor_auth
+) {
+
+	return percepthor_auth->token.permissions;
+
+}
+
+const char *percepthor_auth_get_token_role (
+	const PercepthorAuth *percepthor_auth
+) {
+
+	return percepthor_auth->token.role;
+
+}
+
+const char *percepthor_auth_get_token_user (
+	const PercepthorAuth *percepthor_auth
+) {
+
+	return percepthor_auth->token.user;
+
+}
+
+const char *percepthor_auth_get_token_username (
+	const PercepthorAuth *percepthor_auth
+) {
+
+	return percepthor_auth->token.username;
+
+}
+
+const int64_t percepthor_auth_get_mask (
+	const PercepthorAuth *percepthor_auth
+) {
+
+	return percepthor_auth->mask;
+
+}
+
 PercepthorAuth *percepthor_auth_create (const PercepthorAuthType type) {
 
 	PercepthorAuth *percepthor_auth = percepthor_auth_new ();
@@ -186,7 +251,7 @@ PercepthorAuth *percepthor_auth_create (const PercepthorAuthType type) {
 			case PERCEPTHOR_AUTH_TYPE_MULTIPLE: break;
 			case PERCEPTHOR_AUTH_TYPE_COMPLETE: break;
 
-			default: break;;
+			default: break;
 		}
 	}
 

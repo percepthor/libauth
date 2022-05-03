@@ -107,10 +107,42 @@ AUTH_EXPORT DoubleList *percepthor_auth_get_permissions (
 	const PercepthorAuth *percepthor_auth
 );
 
-extern bool percepthor_auth_permissions_iter_start (PercepthorAuth *percepthor_auth);
+AUTH_EXPORT bool percepthor_auth_permissions_iter_start (PercepthorAuth *percepthor_auth);
 
-extern const struct _Permissions *percepthor_auth_permissions_iter_get_next (
+AUTH_EXPORT const struct _Permissions *percepthor_auth_permissions_iter_get_next (
 	PercepthorAuth *percepthor_auth
+);
+
+AUTH_EXPORT const char *percepthor_auth_get_token_id (
+	const PercepthorAuth *percepthor_auth
+);
+
+AUTH_EXPORT const PercepthorTokenType percepthor_auth_get_token_type (
+	const PercepthorAuth *percepthor_auth
+);
+
+AUTH_EXPORT const char *percepthor_auth_get_token_organization (
+	const PercepthorAuth *percepthor_auth
+);
+
+AUTH_EXPORT const char *percepthor_auth_get_token_permissions (
+	const PercepthorAuth *percepthor_auth
+);
+
+AUTH_EXPORT const char *percepthor_auth_get_token_role (
+	const PercepthorAuth *percepthor_auth
+);
+
+AUTH_EXPORT const char *percepthor_auth_get_token_user (
+	const PercepthorAuth *percepthor_auth
+);
+
+AUTH_EXPORT const char *percepthor_auth_get_token_username (
+	const PercepthorAuth *percepthor_auth
+);
+
+AUTH_EXPORT const int64_t percepthor_auth_get_mask (
+	const PercepthorAuth *percepthor_auth
 );
 
 AUTH_PUBLIC PercepthorAuth *percepthor_auth_create (const PercepthorAuthType type);
