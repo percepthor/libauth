@@ -371,7 +371,7 @@ unsigned int percepthor_single_authentication (
 
 		AuthRequest auth_request = { 0 };
 		auth_request_create_single_permissions (
-			&auth_request, token->str,
+			&auth_request, token->str, auth_service->service_name,
 			permissions_type, resource, action
 		);
 
@@ -761,7 +761,9 @@ unsigned int percepthor_custom_authentication_handler (
 			case PERCEPTHOR_AUTH_TYPE_NONE: break;
 
 			case PERCEPTHOR_AUTH_TYPE_TOKEN:
-				auth_request_create (&auth_request, token->str);
+				auth_request_create (
+					&auth_request, token->str, auth_service->service_name
+				);
 
 				retval = percepthor_custom_internal_authentication_handler (
 					request, auth_service->auth_service_address,
@@ -770,7 +772,10 @@ unsigned int percepthor_custom_authentication_handler (
 				break;
 
 			case PERCEPTHOR_AUTH_TYPE_ACTION:
-				auth_request_create_action (&auth_request, token->str, auth_route->action);
+				auth_request_create_action (
+					&auth_request, token->str,
+					auth_service->service_name, auth_route->action
+				);
 
 				retval = percepthor_custom_internal_authentication_handler (
 					request, auth_service->auth_service_address,
@@ -779,7 +784,10 @@ unsigned int percepthor_custom_authentication_handler (
 				break;
 
 			case PERCEPTHOR_AUTH_TYPE_ROLE:
-				auth_request_create_role (&auth_request, token->str, auth_route->action, auth_route->role);
+				auth_request_create_role (
+					&auth_request, token->str, auth_service->service_name,
+					auth_route->action, auth_route->role
+				);
 
 				retval = percepthor_custom_internal_authentication_handler (
 					request, auth_service->auth_service_address,
@@ -788,7 +796,10 @@ unsigned int percepthor_custom_authentication_handler (
 				break;
 
 			case PERCEPTHOR_AUTH_TYPE_SERVICE:
-				auth_request_create_service (&auth_request, token->str, auth_service->service_id);
+				auth_request_create_service (
+					&auth_request, token->str,
+					auth_service->service_name, auth_service->service_id
+				);
 
 				retval = percepthor_custom_service_authentication_handler (
 					request, auth_service->auth_service_address, &auth_request
@@ -797,7 +808,8 @@ unsigned int percepthor_custom_authentication_handler (
 
 			case PERCEPTHOR_AUTH_TYPE_PERMISSIONS:
 				auth_request_create_management_permissions (
-					&auth_request, token->str, auth_route->permissions_type,
+					&auth_request, token->str, auth_service->service_name,
+					auth_route->permissions_type,
 					auth_route->permissions_action_len ? auth_route->permissions_action : NULL
 				);
 
