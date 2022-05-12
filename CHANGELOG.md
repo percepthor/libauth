@@ -1,6 +1,2 @@
-- Added base percepthor auth token structure definition
-- Added dedicated token structure inside percepthor auth
-- Added methods to get percepthor auth token values
-- Handling token values in custom authentication responses
-- Added dedicated method to print percepthor auth token
-- Handling token in percepthor single authentication
+- Refactored auth request create methods to include source
+- Handling auth request source with custom service name
