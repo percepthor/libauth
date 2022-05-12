@@ -49,32 +49,35 @@ AUTH_PRIVATE void *auth_request_new (void);
 AUTH_PRIVATE void auth_request_delete (void *request_ptr);
 
 AUTH_PRIVATE void auth_request_create (
-	AuthRequest *auth_request, const char *token
+	AuthRequest *auth_request, const char *token, const char *source
 );
 
 AUTH_PRIVATE void auth_request_create_action (
-	AuthRequest *auth_request, const char *token, const char *action
+	AuthRequest *auth_request, const char *token,
+	const char *source, const char *action
 );
 
 AUTH_PRIVATE void auth_request_create_role (
-	AuthRequest *auth_request, const char *token,
+	AuthRequest *auth_request,
+	const char *token, const char *source,
 	const char *action, const char *role
 );
 
 AUTH_PRIVATE void auth_request_create_service (
-	AuthRequest *auth_request, const char *token, const char *service
+	AuthRequest *auth_request, const char *token,
+	const char *source, const char *service
 );
 
 AUTH_PRIVATE void auth_request_create_single_permissions (
-	AuthRequest *auth_request, const char *token,
+	AuthRequest *auth_request,
+	const char *token, const char *source,
 	const PermissionsType permissions_type,
 	const char *resource, const char *permissions_action
 );
 
 AUTH_PRIVATE void auth_request_create_management_permissions (
-	AuthRequest *auth_request, const char *token,
-	const PermissionsType permissions_type,
-	const char *permissions_action
+	AuthRequest *auth_request, const char *token, const char *source,
+	const PermissionsType permissions_type, const char *permissions_action
 );
 
 AUTH_PUBLIC RequestResult auth_request_authentication (

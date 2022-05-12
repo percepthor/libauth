@@ -43,7 +43,7 @@ void auth_request_delete (void *request_ptr) {
 }
 
 void auth_request_create (
-	AuthRequest *auth_request, const char *token
+	AuthRequest *auth_request, const char *token, const char *source
 ) {
 
 	// prepare the request
@@ -54,8 +54,8 @@ void auth_request_create (
 
 	(void) snprintf (
 		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": %d }",
-		PERCEPTHOR_AUTH_TYPE_TOKEN
+		"{ \"type\": %d, \"source\": \"%s\" }",
+		PERCEPTHOR_AUTH_TYPE_TOKEN, source
 	);
 
 	auth_request->body_len = strlen (auth_request->body);
@@ -63,7 +63,8 @@ void auth_request_create (
 }
 
 void auth_request_create_action (
-	AuthRequest *auth_request, const char *token, const char *action
+	AuthRequest *auth_request, const char *token,
+	const char *source, const char *action
 ) {
 
 	// prepare the request
@@ -74,8 +75,8 @@ void auth_request_create_action (
 
 	(void) snprintf (
 		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": %d, \"action\": \"%s\" }",
-		PERCEPTHOR_AUTH_TYPE_ACTION, action
+		"{ \"type\": %d, \"source\": \"%s\", \"action\": \"%s\" }",
+		PERCEPTHOR_AUTH_TYPE_ACTION, source, action
 	);
 
 	auth_request->body_len = strlen (auth_request->body);
@@ -83,7 +84,8 @@ void auth_request_create_action (
 }
 
 void auth_request_create_role (
-	AuthRequest *auth_request, const char *token,
+	AuthRequest *auth_request,
+	const char *token, const char *source,
 	const char *action, const char *role
 ) {
 
@@ -96,8 +98,8 @@ void auth_request_create_role (
 	if (action && role) {
 		(void) snprintf (
 			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": %d, \"action\": \"%s\", \"role\": \"%s\" }",
-			PERCEPTHOR_AUTH_TYPE_ROLE, action, role
+			"{ \"type\": %d, \"source\": \"%s\", \"action\": \"%s\", \"role\": \"%s\" }",
+			PERCEPTHOR_AUTH_TYPE_ROLE, source, action, role
 		);
 	}
 
@@ -114,7 +116,8 @@ void auth_request_create_role (
 }
 
 void auth_request_create_service (
-	AuthRequest *auth_request, const char *token, const char *service
+	AuthRequest *auth_request, const char *token,
+	const char *source, const char *service
 ) {
 
 	// prepare the request
@@ -125,8 +128,8 @@ void auth_request_create_service (
 
 	(void) snprintf (
 		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": %d, \"service\": \"%s\" }",
-		PERCEPTHOR_AUTH_TYPE_SERVICE, service
+		"{ \"type\": %d, \"source\": \"%s\", \"service\": \"%s\" }",
+		PERCEPTHOR_AUTH_TYPE_SERVICE, source, service
 	);
 
 	auth_request->body_len = strlen (auth_request->body);
@@ -134,7 +137,8 @@ void auth_request_create_service (
 }
 
 void auth_request_create_single_permissions (
-	AuthRequest *auth_request, const char *token,
+	AuthRequest *auth_request,
+	const char *token, const char *source,
 	const PermissionsType permissions_type,
 	const char *resource, const char *permissions_action
 ) {
@@ -147,8 +151,9 @@ void auth_request_create_single_permissions (
 
 	(void) snprintf (
 		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": %d, \"scope\": %d, \"permissions_type\": %u, \"resource\": \"%s\", \"action\": \"%s\" }",
-		PERCEPTHOR_AUTH_TYPE_PERMISSIONS, PERCEPTHOR_AUTH_SCOPE_SINGLE, permissions_type,
+		"{ \"type\": %d, \"source\": \"%s\", \"scope\": %d, \"permissions_type\": %u, \"resource\": \"%s\", \"action\": \"%s\" }",
+		PERCEPTHOR_AUTH_TYPE_PERMISSIONS, source,
+		PERCEPTHOR_AUTH_SCOPE_SINGLE, permissions_type,
 		resource, permissions_action
 	);
 
@@ -157,9 +162,8 @@ void auth_request_create_single_permissions (
 }
 
 void auth_request_create_management_permissions (
-	AuthRequest *auth_request, const char *token,
-	const PermissionsType permissions_type,
-	const char *permissions_action
+	AuthRequest *auth_request, const char *token, const char *source,
+	const PermissionsType permissions_type, const char *permissions_action
 ) {
 
 	// prepare the request
@@ -171,8 +175,9 @@ void auth_request_create_management_permissions (
 	if (permissions_action) {
 		(void) snprintf (
 			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": %d, \"scope\": %d, \"permissions_type\": %u, \"action\": \"%s\" }",
-			PERCEPTHOR_AUTH_TYPE_PERMISSIONS, PERCEPTHOR_AUTH_SCOPE_MANAGEMENT, permissions_type,
+			"{ \"type\": %d, \"source\": \"%s\", \"scope\": %d, \"permissions_type\": %u, \"action\": \"%s\" }",
+			PERCEPTHOR_AUTH_TYPE_PERMISSIONS, source,
+			PERCEPTHOR_AUTH_SCOPE_MANAGEMENT, permissions_type,
 			permissions_action
 		);
 	}
