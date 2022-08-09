@@ -93,7 +93,7 @@ AuthRoute *auth_route_create_permissions (
 
 	AuthRoute *auth_route = auth_route_new ();
 	if (auth_route) {
-		auth_route->auth_type = PERCEPTHOR_AUTH_TYPE_SERVICE;
+		auth_route->auth_type = PERCEPTHOR_AUTH_TYPE_PERMISSIONS;
 		auth_route->auth_scope = scope;
 
 		auth_route->permissions_type = permissions_type;
