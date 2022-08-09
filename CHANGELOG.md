@@ -1,2 +1,3 @@
-- Refactored auth request create methods to include source
-- Handling auth request source with custom service name
+- Small organization change in custom authentication sources
+- Changed create permissions route method auth type value
+- Multiple organization changes in percepthor headers
