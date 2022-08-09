@@ -733,8 +733,6 @@ static unsigned int percepthor_custom_permissions_authentication_handler (
 
 }
 
-
-
 unsigned int percepthor_custom_authentication_handler (
 	const HttpReceive *http_receive, const HttpRequest *request
 ) {
