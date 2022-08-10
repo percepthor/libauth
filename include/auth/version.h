@@ -3,10 +3,10 @@
 
 #include "auth/config.h"
 
-#define PERCEPTHOR_AUTH_VERSION				"0.4.2"
-#define PERCEPTHOR_AUTH_VERSION_NAME		"Version 0.4.2"
+#define PERCEPTHOR_AUTH_VERSION				"0.4.3"
+#define PERCEPTHOR_AUTH_VERSION_NAME		"Version 0.4.3"
 #define PERCEPTHOR_AUTH_VERSION_DATE		"09/08/2022"
-#define PERCEPTHOR_AUTH_VERSION_TIME		"18:53 CST"
+#define PERCEPTHOR_AUTH_VERSION_TIME		"21:02 CST"
 #define PERCEPTHOR_AUTH_VERSION_AUTHOR		"Erick Salas"
 
 #ifdef __cplusplus

@@ -1,3 +1,2 @@
-- Small organization change in custom authentication sources
-- Changed create permissions route method auth type value
-- Multiple organization changes in percepthor headers
+- Fixed string compilation warning in permissions action create
+- Added source field in custom management auth request
