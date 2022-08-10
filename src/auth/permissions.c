@@ -22,7 +22,7 @@ PermissionsAction *permissions_action_create (const char *action) {
 
 	PermissionsAction *permissions_action = (PermissionsAction *) malloc (sizeof (PermissionsAction));
 	if (permissions_action) {
-		(void) strncpy (permissions_action->action, action, AUTH_ACTION_SIZE);
+		(void) snprintf (permissions_action->action, AUTH_ACTION_SIZE, "%s", action);
 		permissions_action->action_len = strlen (permissions_action->action);
 	}
 
