@@ -185,8 +185,9 @@ void auth_request_create_management_permissions (
 	else {
 		(void) snprintf (
 			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": %d, \"scope\": %d, \"permissions_type\": %u }",
-			PERCEPTHOR_AUTH_TYPE_PERMISSIONS, PERCEPTHOR_AUTH_SCOPE_MANAGEMENT, permissions_type
+			"{ \"type\": %d, \"source\": \"%s\", \"scope\": %d, \"permissions_type\": %u }",
+			PERCEPTHOR_AUTH_TYPE_PERMISSIONS, source,
+			PERCEPTHOR_AUTH_SCOPE_MANAGEMENT, permissions_type
 		);
 	}
 
