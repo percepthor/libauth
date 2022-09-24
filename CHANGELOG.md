@@ -1,2 +1,2 @@
-- Fixed string compilation warning in permissions action create
-- Added source field in custom management auth request
+- Handle values from route custom data in single authentication
+- Updated percepthor single authentication method interface
