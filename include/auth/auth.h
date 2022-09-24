@@ -156,8 +156,7 @@ AUTH_EXPORT void percepthor_auth_print_token (
 AUTH_EXPORT unsigned int percepthor_single_authentication (
 	const struct _HttpReceive *http_receive,
 	const struct _HttpRequest *request,
-	const PermissionsType permissions_type,
-	const char *resource, const char *action
+	const char *resource
 );
 
 AUTH_EXPORT unsigned int percepthor_custom_authentication_handler (
