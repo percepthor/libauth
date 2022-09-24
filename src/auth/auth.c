@@ -353,8 +353,7 @@ static void percepthor_single_authentication_internal (
 
 unsigned int percepthor_single_authentication (
 	const HttpReceive *http_receive, const HttpRequest *request,
-	const PermissionsType permissions_type,
-	const char *resource, const char *action
+	const char *resource
 ) {
 
 	unsigned int retval = 1;
@@ -369,10 +368,14 @@ unsigned int percepthor_single_authentication (
 			const AuthService *
 		) http_receive->http_cerver->custom_data;
 
+		const AuthRoute *auth_route = (
+			const AuthRoute *
+		) http_receive->route->custom_data;
+
 		AuthRequest auth_request = { 0 };
 		auth_request_create_single_permissions (
 			&auth_request, token->str, auth_service->service_name,
-			permissions_type, resource, action
+			auth_route->permissions_type, resource, auth_route->action
 		);
 
 		// perform request to auth service
@@ -380,7 +383,8 @@ unsigned int percepthor_single_authentication (
 			auth_service->auth_service_address, &auth_request
 		)) {
 			percepthor_single_authentication_internal (
-				request, &auth_request, permissions_type, resource, action
+				request, &auth_request, auth_route->permissions_type,
+				resource, auth_route->action
 			);
 
 			retval = 0;
