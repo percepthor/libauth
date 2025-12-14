@@ -17,7 +17,9 @@
 	#define _XOPEN_SOURCE 700
 #endif
 
-#include <features.h>
+#ifdef __linux__
+	#include <features.h>
+#endif
 
 // to be used in the application
 #define AUTH_EXPORT 			extern
