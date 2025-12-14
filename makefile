@@ -36,6 +36,9 @@ DEFINES		:= -D _GNU_SOURCE
 
 DEVELOPMENT	:= -D PERCEPTHOR_DEBUG
 
+# only the AUTH_EXPORT and AUTH_PUBLIC functions are exported by the library
+VISIBILITY	:= -fvisibility=hidden
+
 CC          := gcc
 
 GCCVGTEQ8 	:= $(shell expr `gcc -dumpversion | cut -f1 -d.` \>= 8)
@@ -101,7 +104,7 @@ ifneq ($(SANITIZER),)
 endif
 
 # common flags
-CFLAGS += -fPIC $(COMMON) $(SANITIZERFLAGS)
+CFLAGS += -fPIC $(VISIBILITY) $(COMMON) $(SANITIZERFLAGS)
 
 LIB         := -L /usr/local/lib $(PTHREAD) $(MATH) $(OPENSSL) $(CURL) $(CERVER) $(SANITIZERFLAGS)
 

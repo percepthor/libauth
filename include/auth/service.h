@@ -24,9 +24,9 @@ typedef struct AuthService {
 
 } AuthService;
 
-AUTH_PRIVATE AuthService *auth_service_new (void);
+AUTH_EXPORT AuthService *auth_service_new (void);
 
-AUTH_PRIVATE void auth_service_delete (void *auth_service_ptr);
+AUTH_EXPORT void auth_service_delete (void *auth_service_ptr);
 
 AUTH_EXPORT AuthService *auth_service_create (
 	const char *service_id,

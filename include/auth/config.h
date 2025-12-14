@@ -21,13 +21,21 @@
 	#include <features.h>
 #endif
 
+#if defined (__GNUC__) || defined (__clang__)
+	#define AUTH_VISIBLE			__attribute__ ((visibility ("default")))
+	#define AUTH_HIDDEN				__attribute__ ((visibility ("hidden")))
+#else
+	#define AUTH_VISIBLE
+	#define AUTH_HIDDEN
+#endif
+
 // to be used in the application
-#define AUTH_EXPORT 			extern
+#define AUTH_EXPORT 			extern AUTH_VISIBLE
 
 // to be used by internal libauth methods
-#define AUTH_PRIVATE			extern
+#define AUTH_PRIVATE			extern AUTH_HIDDEN
 
 // used by private methods but can be used by the application
-#define AUTH_PUBLIC 			extern
+#define AUTH_PUBLIC 			extern AUTH_VISIBLE
 
 #endif
