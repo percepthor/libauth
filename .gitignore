@@ -11,3 +11,5 @@ data
 uploads
 
 logs
+
+fuzz-artifacts
