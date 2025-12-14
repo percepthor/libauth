@@ -2,6 +2,10 @@ TYPE		:= development
 
 NATIVE		:= 0
 
+COVERAGE	:= 0
+
+SANITIZER	:=
+
 SLIB		:= libauth.so
 
 all: directories $(SLIB)
@@ -46,6 +50,9 @@ SRCEXT      := c
 DEPEXT      := d
 OBJEXT      := o
 
+COVDIR		:= coverage
+COVEXT		:= gcov
+
 # common flags
 # -Wconversion
 COMMON		:= -Wall -Wno-unknown-pragmas \
@@ -62,6 +69,9 @@ ifeq ($(TYPE), development)
 	CFLAGS += -g -fasynchronous-unwind-tables $(DEVELOPMENT)
 else ifeq ($(TYPE), test)
 	CFLAGS += -g -fasynchronous-unwind-tables -D_FORTIFY_SOURCE=2 -fstack-protector -O2
+	ifeq ($(COVERAGE), 1)
+		CFLAGS += -fprofile-arcs -ftest-coverage
+	endif
 else ifeq ($(TYPE), beta)
 	CFLAGS += -g -D_FORTIFY_SOURCE=2 -O2
 else
@@ -69,7 +79,7 @@ else
 endif
 
 # check which compiler we are using
-ifeq ($(CC), g++) 
+ifeq ($(CC), g++)
 	CFLAGS += -std=c++11 -fpermissive
 else
 	CFLAGS += -std=c11 -Wpedantic -pedantic-errors
@@ -85,13 +95,20 @@ ifeq ($(NATIVE), 1)
 	CFLAGS += -march=native
 endif
 
-# common flags
-CFLAGS += -fPIC $(COMMON)
+# address,undefined or thread, for the library and for the tests
+ifneq ($(SANITIZER),)
+	SANITIZERFLAGS := -fsanitize=$(SANITIZER) -fno-omit-frame-pointer
+endif
 
-LIB         := -L /usr/local/lib $(PTHREAD) $(MATH) $(OPENSSL) $(CURL) $(CERVER)
+# common flags
+CFLAGS += -fPIC $(COMMON) $(SANITIZERFLAGS)
+
+LIB         := -L /usr/local/lib $(PTHREAD) $(MATH) $(OPENSSL) $(CURL) $(CERVER) $(SANITIZERFLAGS)
 
 ifeq ($(TYPE), test)
-	LIB += -lgcov --coverage
+	ifeq ($(COVERAGE), 1)
+		LIB += -lgcov --coverage
+	endif
 endif
 
 INC         := -I $(INCDIR) -I /usr/local/include $(CERVER_INC)
@@ -124,7 +141,7 @@ TESTBUILD	:= $(TESTDIR)/objs
 TESTTARGET	:= $(TESTDIR)/bin
 TESTCOVDIR	:= $(COVDIR)/test
 
-TESTFLAGS	:= -g $(DEFINES) -Wall -Wno-unknown-pragmas -Wno-format
+TESTFLAGS	:= -g $(DEFINES) -Wall -Wno-unknown-pragmas -Wno-format $(SANITIZERFLAGS)
 
 ifeq ($(TYPE), test)
 	ifeq ($(COVERAGE), 1)
@@ -174,10 +191,17 @@ $(TESTBUILD)/%.$(OBJEXT): $(TESTDIR)/%.$(SRCEXT)
 	@sed -e 's/.*://' -e 's/\\$$//' < $(TESTBUILD)/$*.$(DEPEXT).tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $(TESTBUILD)/$*.$(DEPEXT)
 	@rm -f $(TESTBUILD)/$*.$(DEPEXT).tmp
 
+# coverage of the library from a TYPE=test COVERAGE=1 build after running the tests
+coverage:
+	@mkdir -p $(COVDIR)
+	gcov -o $(BUILDDIR)/auth $(SOURCES) > /dev/null
+	@mv *.$(COVEXT) $(COVDIR)/ 2> /dev/null || true
+
 clear: clean-objects clean-tests
 
 clean: clear
 	@$(RM) -rf $(TARGETDIR)
+	@$(RM) -rf $(COVDIR)
 
 clean-objects:
 	@$(RM) -rf $(BUILDDIR)
@@ -186,4 +210,4 @@ clean-tests:
 	@$(RM) -rf $(TESTBUILD)
 	@$(RM) -rf $(TESTTARGET)
 
-.PHONY: all clean test
+.PHONY: all clean test coverage
