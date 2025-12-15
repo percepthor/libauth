@@ -9,7 +9,7 @@
 #include "auth/permissions.h"
 
 #define AUTH_HEADER_SIZE		1024
-#define AUTH_REQUEST_SIZE		512
+#define AUTH_REQUEST_SIZE		4096
 #define AUTH_RESPONSE_SIZE		1024
 
 // limits for a request to the auth service,

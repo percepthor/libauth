@@ -6,6 +6,8 @@
 
 #include <curl/curl.h>
 
+#include <cerver/http/json/json.h>
+
 #ifdef PERCEPTHOR_DEBUG
 #include <cerver/utils/log.h>
 #endif
@@ -86,19 +88,101 @@ static void auth_request_header (AuthRequest *auth_request, const char *token) {
 
 }
 
+// adds a string to the body; a missing or empty value is left out
+static bool auth_request_body_add_string (
+	json_t *body, const char *key, const char *value
+) {
+
+	bool added = true;
+
+	if (value && value[0]) {
+		// json_string () fails on a value that is not valid UTF-8
+		added = !json_object_set_new (body, key, json_string (value));
+	}
+
+	return added;
+
+}
+
+static bool auth_request_body_add_integer (
+	json_t *body, const char *key, const json_int_t value
+) {
+
+	return !json_object_set_new (body, key, json_integer (value));
+
+}
+
+// the base of every body, with the auth type and the source service
+static json_t *auth_request_body_create (
+	const PercepthorAuthType type, const char *source, bool *valid
+) {
+
+	json_t *body = json_object ();
+	if (body) {
+		*valid = auth_request_body_add_integer (body, "type", type)
+			&& auth_request_body_add_string (body, "source", source);
+	}
+
+	else {
+		*valid = false;
+	}
+
+	return body;
+
+}
+
+// the values are escaped by the serializer, so a quote in a resource
+// can not add or overwrite a field of the request to the auth service
+static void auth_request_body_dump (
+	AuthRequest *auth_request, json_t *body, const bool valid
+) {
+
+	if (!auth_request) {
+		if (body) json_decref (body);
+
+		return;
+	}
+
+	auth_request->body_len = 0;
+	auth_request->body[0] = '\0';
+
+	if (body && valid) {
+		const size_t needed = json_dumpb (
+			body, auth_request->body, AUTH_REQUEST_SIZE - 1, JSON_COMPACT
+		);
+
+		if ((needed > 0) && (needed < AUTH_REQUEST_SIZE)) {
+			auth_request->body[needed] = '\0';
+			auth_request->body_len = needed;
+		}
+
+		else {
+			auth_request->body[0] = '\0';
+
+			#ifdef PERCEPTHOR_DEBUG
+			cerver_log_error (
+				"auth_request_body_dump () - "
+				"a body of %zu bytes does not fit in %d bytes!",
+				needed, AUTH_REQUEST_SIZE
+			);
+			#endif
+		}
+	}
+
+	if (body) json_decref (body);
+
+}
+
 void auth_request_create (
 	AuthRequest *auth_request, const char *token, const char *source
 ) {
 
 	auth_request_header (auth_request, token);
 
-	(void) snprintf (
-		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": %d, \"source\": \"%s\" }",
-		PERCEPTHOR_AUTH_TYPE_TOKEN, source
-	);
+	bool valid = false;
+	json_t *body = auth_request_body_create (PERCEPTHOR_AUTH_TYPE_TOKEN, source, &valid);
 
-	auth_request->body_len = strlen (auth_request->body);
+	auth_request_body_dump (auth_request, body, valid);
 
 }
 
@@ -109,16 +193,17 @@ void auth_request_create_action (
 
 	auth_request_header (auth_request, token);
 
-	(void) snprintf (
-		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": %d, \"source\": \"%s\", \"action\": \"%s\" }",
-		PERCEPTHOR_AUTH_TYPE_ACTION, source, action
-	);
+	bool valid = false;
+	json_t *body = auth_request_body_create (PERCEPTHOR_AUTH_TYPE_ACTION, source, &valid);
+	if (body) {
+		valid = valid && auth_request_body_add_string (body, "action", action);
+	}
 
-	auth_request->body_len = strlen (auth_request->body);
+	auth_request_body_dump (auth_request, body, valid);
 
 }
 
+// the action of a role is optional, the role is required
 void auth_request_create_role (
 	AuthRequest *auth_request,
 	const char *token, const char *source,
@@ -127,23 +212,15 @@ void auth_request_create_role (
 
 	auth_request_header (auth_request, token);
 
-	if (action && role) {
-		(void) snprintf (
-			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": %d, \"source\": \"%s\", \"action\": \"%s\", \"role\": \"%s\" }",
-			PERCEPTHOR_AUTH_TYPE_ROLE, source, action, role
-		);
+	bool valid = false;
+	json_t *body = auth_request_body_create (PERCEPTHOR_AUTH_TYPE_ROLE, source, &valid);
+	if (body) {
+		valid = valid
+			&& auth_request_body_add_string (body, "action", action)
+			&& auth_request_body_add_string (body, "role", role);
 	}
 
-	else {
-		(void) snprintf (
-			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": %d, \"action\": None, \"role\": \"%s\" }",
-			PERCEPTHOR_AUTH_TYPE_ROLE, role
-		);
-	}
-
-	auth_request->body_len = strlen (auth_request->body);
+	auth_request_body_dump (auth_request, body, valid);
 
 }
 
@@ -154,13 +231,13 @@ void auth_request_create_service (
 
 	auth_request_header (auth_request, token);
 
-	(void) snprintf (
-		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": %d, \"source\": \"%s\", \"service\": \"%s\" }",
-		PERCEPTHOR_AUTH_TYPE_SERVICE, source, service
-	);
+	bool valid = false;
+	json_t *body = auth_request_body_create (PERCEPTHOR_AUTH_TYPE_SERVICE, source, &valid);
+	if (body) {
+		valid = valid && auth_request_body_add_string (body, "service", service);
+	}
 
-	auth_request->body_len = strlen (auth_request->body);
+	auth_request_body_dump (auth_request, body, valid);
 
 }
 
@@ -170,18 +247,20 @@ void auth_request_create_single_permissions (
 	const PermissionsType permissions_type,
 	const char *resource, const char *permissions_action
 ) {
-	
+
 	auth_request_header (auth_request, token);
 
-	(void) snprintf (
-		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": %d, \"source\": \"%s\", \"scope\": %d, \"permissions_type\": %u, \"resource\": \"%s\", \"action\": \"%s\" }",
-		PERCEPTHOR_AUTH_TYPE_PERMISSIONS, source,
-		PERCEPTHOR_AUTH_SCOPE_SINGLE, permissions_type,
-		resource, permissions_action
-	);
+	bool valid = false;
+	json_t *body = auth_request_body_create (PERCEPTHOR_AUTH_TYPE_PERMISSIONS, source, &valid);
+	if (body) {
+		valid = valid
+			&& auth_request_body_add_integer (body, "scope", PERCEPTHOR_AUTH_SCOPE_SINGLE)
+			&& auth_request_body_add_integer (body, "permissions_type", permissions_type)
+			&& auth_request_body_add_string (body, "resource", resource)
+			&& auth_request_body_add_string (body, "action", permissions_action);
+	}
 
-	auth_request->body_len = strlen (auth_request->body);
+	auth_request_body_dump (auth_request, body, valid);
 
 }
 
@@ -192,26 +271,16 @@ void auth_request_create_management_permissions (
 
 	auth_request_header (auth_request, token);
 
-	if (permissions_action) {
-		(void) snprintf (
-			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": %d, \"source\": \"%s\", \"scope\": %d, \"permissions_type\": %u, \"action\": \"%s\" }",
-			PERCEPTHOR_AUTH_TYPE_PERMISSIONS, source,
-			PERCEPTHOR_AUTH_SCOPE_MANAGEMENT, permissions_type,
-			permissions_action
-		);
+	bool valid = false;
+	json_t *body = auth_request_body_create (PERCEPTHOR_AUTH_TYPE_PERMISSIONS, source, &valid);
+	if (body) {
+		valid = valid
+			&& auth_request_body_add_integer (body, "scope", PERCEPTHOR_AUTH_SCOPE_MANAGEMENT)
+			&& auth_request_body_add_integer (body, "permissions_type", permissions_type)
+			&& auth_request_body_add_string (body, "action", permissions_action);
 	}
 
-	else {
-		(void) snprintf (
-			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": %d, \"source\": \"%s\", \"scope\": %d, \"permissions_type\": %u }",
-			PERCEPTHOR_AUTH_TYPE_PERMISSIONS, source,
-			PERCEPTHOR_AUTH_SCOPE_MANAGEMENT, permissions_type
-		);
-	}
-
-	auth_request->body_len = strlen (auth_request->body);
+	auth_request_body_dump (auth_request, body, valid);
 
 }
 
