@@ -153,6 +153,12 @@ AUTH_EXPORT void percepthor_auth_print_token (
 	const PercepthorAuth *percepthor_auth
 );
 
+// reads the response of the auth service into the auth values,
+// returns 0 when it is a json object
+AUTH_PRIVATE unsigned int percepthor_auth_handle_response (
+	PercepthorAuth *percepthor_auth, const char *response
+);
+
 AUTH_EXPORT unsigned int percepthor_single_authentication (
 	const struct _HttpReceive *http_receive,
 	const struct _HttpRequest *request,
