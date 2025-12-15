@@ -9,9 +9,7 @@
 
 #include <cerver/http/json/json.h>
 
-#ifdef PERCEPTHOR_DEBUG
 #include <cerver/utils/log.h>
-#endif
 
 #include "auth/auth.h"
 #include "auth/permissions.h"
