@@ -1,5 +1,5 @@
-#ifndef _PERCEPTHOR_AUTH_VERSION_H_
-#define _PERCEPTHOR_AUTH_VERSION_H_
+#ifndef _PERCEPTHOR_AUTH_REQUESTS_H_
+#define _PERCEPTHOR_AUTH_REQUESTS_H_
 
 #include <stddef.h>
 
