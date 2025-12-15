@@ -2,6 +2,7 @@
 #define _PERCEPTHOR_AUTH_REQUESTS_H_
 
 #include <stddef.h>
+#include <stdbool.h>
 
 #include "auth/auth.h"
 #include "auth/config.h"
@@ -46,6 +47,7 @@ AUTH_PUBLIC const char *request_result_to_string (
 typedef struct AuthRequest {
 
 	char auth_header[AUTH_HEADER_SIZE];
+	size_t auth_header_len;
 
 	char body[AUTH_REQUEST_SIZE];
 	size_t body_len;
@@ -58,6 +60,9 @@ typedef struct AuthRequest {
 AUTH_PRIVATE void *auth_request_new (void);
 
 AUTH_PRIVATE void auth_request_delete (void *request_ptr);
+
+// a request is only sent when its header and its body were complete
+AUTH_PRIVATE bool auth_request_is_valid (const AuthRequest *auth_request);
 
 AUTH_PRIVATE void auth_request_create (
 	AuthRequest *auth_request, const char *token, const char *source
