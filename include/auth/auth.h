@@ -83,11 +83,11 @@ typedef struct PercepthorAuth {
 
 AUTH_PUBLIC void percepthor_auth_delete (void *auth_ptr);
 
-AUTH_EXPORT const PercepthorAuthType percepthor_auth_get_type (
+AUTH_EXPORT PercepthorAuthType percepthor_auth_get_type (
 	const PercepthorAuth *percepthor_auth
 );
 
-AUTH_EXPORT const PercepthorAuthScope percepthor_auth_get_scope (
+AUTH_EXPORT PercepthorAuthScope percepthor_auth_get_scope (
 	const PercepthorAuth *percepthor_auth
 );
 
@@ -99,7 +99,7 @@ AUTH_EXPORT const char *percepthor_auth_get_action (
 	const PercepthorAuth *percepthor_auth
 );
 
-AUTH_EXPORT const bool percepthor_auth_get_admin (
+AUTH_EXPORT bool percepthor_auth_get_admin (
 	const PercepthorAuth *percepthor_auth
 );
 
@@ -117,7 +117,7 @@ AUTH_EXPORT const char *percepthor_auth_get_token_id (
 	const PercepthorAuth *percepthor_auth
 );
 
-AUTH_EXPORT const PercepthorTokenType percepthor_auth_get_token_type (
+AUTH_EXPORT PercepthorTokenType percepthor_auth_get_token_type (
 	const PercepthorAuth *percepthor_auth
 );
 
@@ -141,7 +141,7 @@ AUTH_EXPORT const char *percepthor_auth_get_token_username (
 	const PercepthorAuth *percepthor_auth
 );
 
-AUTH_EXPORT const int64_t percepthor_auth_get_mask (
+AUTH_EXPORT int64_t percepthor_auth_get_mask (
 	const PercepthorAuth *percepthor_auth
 );
 

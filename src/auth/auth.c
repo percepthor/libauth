@@ -75,19 +75,21 @@ void percepthor_auth_delete (void *auth_ptr) {
 
 }
 
-const PercepthorAuthType percepthor_auth_get_type (
+// every getter accepts the NULL custom data of a request
+// that was not authenticated by libauth
+PercepthorAuthType percepthor_auth_get_type (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->type;
+	return percepthor_auth ? percepthor_auth->type : PERCEPTHOR_AUTH_TYPE_NONE;
 
 }
 
-const PercepthorAuthScope percepthor_auth_get_scope (
+PercepthorAuthScope percepthor_auth_get_scope (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->scope;
+	return percepthor_auth ? percepthor_auth->scope : PERCEPTHOR_AUTH_SCOPE_NONE;
 
 }
 
@@ -95,7 +97,7 @@ const char *percepthor_auth_get_resource (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->resource;
+	return percepthor_auth ? percepthor_auth->resource : NULL;
 
 }
 
@@ -103,15 +105,15 @@ const char *percepthor_auth_get_action (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->action;
+	return percepthor_auth ? percepthor_auth->action : NULL;
 
 }
 
-const bool percepthor_auth_get_admin (
+bool percepthor_auth_get_admin (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->super_admin;
+	return percepthor_auth ? percepthor_auth->super_admin : false;
 
 }
 
@@ -127,7 +129,7 @@ DoubleList *percepthor_auth_get_permissions (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->permissions;
+	return percepthor_auth ? percepthor_auth->permissions : NULL;
 
 }
 
@@ -159,7 +161,7 @@ const Permissions *percepthor_auth_permissions_iter_get_next (
 
 	const Permissions *permissions = NULL;
 
-	if (percepthor_auth->next_permissions) {
+	if (percepthor_auth && percepthor_auth->next_permissions) {
 		permissions = (const Permissions *) percepthor_auth->next_permissions->data;
 		percepthor_auth->next_permissions = percepthor_auth->next_permissions->next;
 	}
@@ -172,15 +174,15 @@ const char *percepthor_auth_get_token_id (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->token.id;
+	return percepthor_auth ? percepthor_auth->token.id : NULL;
 
 }
 
-const PercepthorTokenType percepthor_auth_get_token_type (
+PercepthorTokenType percepthor_auth_get_token_type (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->token.type;
+	return percepthor_auth ? percepthor_auth->token.type : PERCEPTHOR_TOKEN_TYPE_NONE;
 
 }
 
@@ -188,7 +190,7 @@ const char *percepthor_auth_get_token_organization (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->token.organization;
+	return percepthor_auth ? percepthor_auth->token.organization : NULL;
 
 }
 
@@ -196,7 +198,7 @@ const char *percepthor_auth_get_token_permissions (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->token.permissions;
+	return percepthor_auth ? percepthor_auth->token.permissions : NULL;
 
 }
 
@@ -204,7 +206,7 @@ const char *percepthor_auth_get_token_role (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->token.role;
+	return percepthor_auth ? percepthor_auth->token.role : NULL;
 
 }
 
@@ -212,7 +214,7 @@ const char *percepthor_auth_get_token_user (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->token.user;
+	return percepthor_auth ? percepthor_auth->token.user : NULL;
 
 }
 
@@ -220,15 +222,29 @@ const char *percepthor_auth_get_token_username (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->token.username;
+	return percepthor_auth ? percepthor_auth->token.username : NULL;
 
 }
 
-const int64_t percepthor_auth_get_mask (
+int64_t percepthor_auth_get_mask (
 	const PercepthorAuth *percepthor_auth
 ) {
 
-	return percepthor_auth->mask;
+	return percepthor_auth ? percepthor_auth->mask : 0;
+
+}
+
+// the permissions of a management route are read into their list,
+// so a permissions auth without its list is not created at all
+static PercepthorAuth *percepthor_auth_create_permissions (PercepthorAuth *percepthor_auth) {
+
+	percepthor_auth->permissions = dlist_init (permissions_delete, NULL);
+	if (!percepthor_auth->permissions) {
+		percepthor_auth_delete (percepthor_auth);
+		percepthor_auth = NULL;
+	}
+
+	return percepthor_auth;
 
 }
 
@@ -247,7 +263,7 @@ PercepthorAuth *percepthor_auth_create (const PercepthorAuthType type) {
 			case PERCEPTHOR_AUTH_TYPE_SERVICE: break;
 
 			case PERCEPTHOR_AUTH_TYPE_PERMISSIONS:
-				percepthor_auth->permissions = dlist_init (permissions_delete, NULL);
+				percepthor_auth = percepthor_auth_create_permissions (percepthor_auth);
 				break;
 
 			case PERCEPTHOR_AUTH_TYPE_MULTIPLE: break;
@@ -263,7 +279,9 @@ PercepthorAuth *percepthor_auth_create (const PercepthorAuthType type) {
 
 void percepthor_auth_print_token (const PercepthorAuth *percepthor_auth) {
 
-	percepthor_token_print (&percepthor_auth->token);
+	if (percepthor_auth) {
+		percepthor_token_print (&percepthor_auth->token);
+	}
 
 }
 
