@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <pthread.h>
+
 #include <curl/curl.h>
 
 #ifdef PERCEPTHOR_DEBUG
@@ -10,6 +12,16 @@
 #include "auth/auth.h"
 #include "auth/permissions.h"
 #include "auth/requests.h"
+
+// curl_easy_init () calls curl_global_init () implicitly when needed,
+// which is not thread safe, so the global init is done exactly once
+static pthread_once_t auth_request_curl_once = PTHREAD_ONCE_INIT;
+
+static void auth_request_curl_global_init (void) {
+
+	(void) curl_global_init (CURL_GLOBAL_DEFAULT);
+
+}
 
 const char *request_result_to_string (const RequestResult type) {
 
@@ -254,9 +266,19 @@ RequestResult auth_request_authentication (
 
 	RequestResult result = REQUEST_RESULT_NONE;
 
+	(void) pthread_once (&auth_request_curl_once, auth_request_curl_global_init);
+
 	CURL *curl = curl_easy_init ();
 	if (curl) {
 		curl_easy_setopt (curl, CURLOPT_URL, auth_service_address);
+
+		// this runs inside a multi threaded server:
+		// never let curl use signals (SIGALRM) for its timeouts,
+		// they interrupt the system calls of other threads (EINTR)
+		curl_easy_setopt (curl, CURLOPT_NOSIGNAL, 1L);
+
+		curl_easy_setopt (curl, CURLOPT_CONNECTTIMEOUT, (long) AUTH_REQUEST_CONNECT_TIMEOUT);
+		curl_easy_setopt (curl, CURLOPT_TIMEOUT, (long) AUTH_REQUEST_TIMEOUT);
 
 		// add custom "Authorization" header
 		struct curl_slist *headers = NULL;

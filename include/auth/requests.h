@@ -11,6 +11,17 @@
 #define AUTH_REQUEST_SIZE		512
 #define AUTH_RESPONSE_SIZE		1024
 
+// limits for a request to the auth service,
+// so a slow or hung auth service can not block the caller's thread forever;
+// the test build lowers them to keep the slow auth service cases short
+#ifndef AUTH_REQUEST_CONNECT_TIMEOUT
+#define AUTH_REQUEST_CONNECT_TIMEOUT	10
+#endif
+
+#ifndef AUTH_REQUEST_TIMEOUT
+#define AUTH_REQUEST_TIMEOUT			30
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
