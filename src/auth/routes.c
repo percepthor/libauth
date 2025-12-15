@@ -42,9 +42,10 @@ AuthRoute *auth_route_create_action (const char *action) {
 	if (auth_route) {
 		auth_route->auth_type = PERCEPTHOR_AUTH_TYPE_ACTION;
 
-		auth_route->action_len = snprintf (
-			auth_route->action, AUTH_ROUTE_ACTION_SIZE, "%s", action
-		);
+		if (action) {
+			(void) snprintf (auth_route->action, AUTH_ROUTE_ACTION_SIZE, "%s", action);
+			auth_route->action_len = (int) strlen (auth_route->action);
+		}
 	}
 
 	return auth_route;
@@ -58,15 +59,13 @@ AuthRoute *auth_route_create_role (const char *action, const char *role) {
 		auth_route->auth_type = PERCEPTHOR_AUTH_TYPE_ROLE;
 
 		if (action) {
-			auth_route->action_len = snprintf (
-				auth_route->action, AUTH_ROUTE_ACTION_SIZE, "%s", action
-			);
+			(void) snprintf (auth_route->action, AUTH_ROUTE_ACTION_SIZE, "%s", action);
+			auth_route->action_len = (int) strlen (auth_route->action);
 		}
 
 		if (role) {
-			auth_route->role_len = snprintf (
-				auth_route->role, AUTH_ROUTE_ROLE_SIZE, "%s", role
-			);
+			(void) snprintf (auth_route->role, AUTH_ROUTE_ROLE_SIZE, "%s", role);
+			auth_route->role_len = (int) strlen (auth_route->role);
 		}
 	}
 
@@ -99,10 +98,12 @@ AuthRoute *auth_route_create_permissions (
 		auth_route->permissions_type = permissions_type;
 
 		if (permissions_action) {
-			auth_route->permissions_action_len = snprintf (
+			(void) snprintf (
 				auth_route->permissions_action, AUTH_ROUTE_PERMISSIONS_SIZE,
 				"%s", permissions_action
 			);
+
+			auth_route->permissions_action_len = (int) strlen (auth_route->permissions_action);
 		}
 	}
 
