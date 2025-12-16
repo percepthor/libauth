@@ -21,6 +21,15 @@
 	#include <features.h>
 #endif
 
+/**
+ * @file config.h
+ * @brief The export macros of libauth.
+ *
+ * libauth is compiled with -fvisibility=hidden: libauth.so only exports the
+ * functions marked with AUTH_EXPORT or AUTH_PUBLIC, the AUTH_PRIVATE ones are
+ * only visible inside the library and to its tests, that link its objects.
+ */
+
 #if defined (__GNUC__) || defined (__clang__)
 	#define AUTH_VISIBLE			__attribute__ ((visibility ("default")))
 	#define AUTH_HIDDEN				__attribute__ ((visibility ("hidden")))
@@ -29,13 +38,13 @@
 	#define AUTH_HIDDEN
 #endif
 
-// to be used in the application
+/** @brief A function of the API, to be used by the application. */
 #define AUTH_EXPORT 			extern AUTH_VISIBLE
 
-// to be used by internal libauth methods
+/** @brief An internal function of libauth, never exported by libauth.so. */
 #define AUTH_PRIVATE			extern AUTH_HIDDEN
 
-// used by private methods but can be used by the application
+/** @brief A function that libauth uses internally and the application can also use. */
 #define AUTH_PUBLIC 			extern AUTH_VISIBLE
 
 #endif
