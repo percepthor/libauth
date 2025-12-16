@@ -523,6 +523,8 @@ static unsigned int percepthor_auth_request_handle (
 		else {
 			percepthor_auth_delete (percepthor_auth);
 		}
+
+		auth_request_end (auth_request);
 	}
 
 	return retval;

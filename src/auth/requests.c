@@ -51,9 +51,23 @@ void *auth_request_new (void) {
 
 }
 
+void auth_request_end (AuthRequest *auth_request) {
+
+	if (auth_request) {
+		free (auth_request->response);
+
+		auth_request->response = NULL;
+		auth_request->response_len = 0;
+		auth_request->response_size = 0;
+	}
+
+}
+
 void auth_request_delete (void *request_ptr) {
 
 	if (request_ptr) {
+		auth_request_end ((AuthRequest *) request_ptr);
+
 		free (request_ptr);
 	}
 
@@ -284,6 +298,40 @@ void auth_request_create_management_permissions (
 
 }
 
+// the size of the buffer for an answer of a length and its terminating null byte:
+// it doubles from AUTH_RESPONSE_INITIAL_SIZE, 0 when it would pass AUTH_RESPONSE_MAX_SIZE
+static size_t auth_request_response_size (const size_t current, const size_t needed) {
+
+	size_t size = current ? current : AUTH_RESPONSE_INITIAL_SIZE;
+	while ((size < needed) && (size <= (AUTH_RESPONSE_MAX_SIZE / 2))) {
+		size *= 2;
+	}
+
+	return (size >= needed) ? size : 0;
+
+}
+
+// makes room for the answer and its terminating null byte, false when it can not grow
+static bool auth_request_response_reserve (AuthRequest *auth_request, const size_t needed) {
+
+	bool reserved = (auth_request->response && (needed <= auth_request->response_size));
+
+	if (!reserved) {
+		const size_t size = auth_request_response_size (auth_request->response_size, needed);
+		if (size) {
+			char *response = (char *) realloc (auth_request->response, size);
+			if (response) {
+				auth_request->response = response;
+				auth_request->response_size = size;
+				reserved = true;
+			}
+		}
+	}
+
+	return reserved;
+
+}
+
 static size_t auth_request_authentication_write_cb (
 	void *contents, size_t size, size_t nmemb, void *auth_mem
 ) {
@@ -292,10 +340,24 @@ static size_t auth_request_authentication_write_cb (
 
 	AuthRequest *auth_request = (AuthRequest *) auth_mem;
 
-	char *auth_response_mem = auth_request->response;
-	(void) memcpy (&(auth_response_mem[auth_request->response_ptr]), contents, real_size);
-	auth_request->response_ptr += real_size;
-	auth_response_mem[auth_request->response_ptr] = 0;
+	// keep room for the terminating null byte;
+	// an answer larger than AUTH_RESPONSE_MAX_SIZE fails the request
+	// (curl gets CURLE_WRITE_ERROR) instead of being read truncated
+	if (!auth_request_response_reserve (auth_request, auth_request->response_len + real_size + 1)) {
+		#ifdef PERCEPTHOR_DEBUG
+		cerver_log_error (
+			"auth_request_authentication_write_cb () - "
+			"an answer of %zu bytes does not fit in %d bytes!",
+			auth_request->response_len + real_size, AUTH_RESPONSE_MAX_SIZE
+		);
+		#endif
+
+		return 0;
+	}
+
+	(void) memcpy (auth_request->response + auth_request->response_len, contents, real_size);
+	auth_request->response_len += real_size;
+	auth_request->response[auth_request->response_len] = '\0';
 
 	return real_size;
 
@@ -321,7 +383,8 @@ static struct curl_slist *auth_request_headers (const AuthRequest *auth_request)
 
 }
 
-static RequestResult auth_request_perform (CURL *curl) {
+// a 200 without an answer can not be read, so it is a failed request
+static RequestResult auth_request_perform (CURL *curl, const AuthRequest *auth_request) {
 
 	RequestResult result = REQUEST_RESULT_NONE;
 
@@ -352,6 +415,10 @@ static RequestResult auth_request_perform (CURL *curl) {
 		result = REQUEST_RESULT_BAD_STATUS;
 	}
 
+	else if (!auth_request->response) {
+		result = REQUEST_RESULT_FAILED;
+	}
+
 	return result;
 
 }
@@ -365,6 +432,9 @@ RequestResult auth_request_authentication (
 
 	if (auth_service_address && auth_service_address[0] && auth_request_is_valid (auth_request)) {
 		(void) pthread_once (&auth_request_curl_once, auth_request_curl_global_init);
+
+		// a request sent again does not keep the answer of the previous one
+		auth_request_end (auth_request);
 
 		CURL *curl = curl_easy_init ();
 		if (curl) {
@@ -392,7 +462,7 @@ RequestResult auth_request_authentication (
 
 				curl_easy_setopt (curl, CURLOPT_WRITEDATA, auth_request);
 
-				result = auth_request_perform (curl);
+				result = auth_request_perform (curl, auth_request);
 
 				curl_slist_free_all (headers);
 			}

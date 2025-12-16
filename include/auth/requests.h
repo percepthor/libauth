@@ -10,7 +10,14 @@
 
 #define AUTH_HEADER_SIZE		1024
 #define AUTH_REQUEST_SIZE		4096
-#define AUTH_RESPONSE_SIZE		1024
+
+// the response buffer starts with this size and doubles while the answer grows
+#define AUTH_RESPONSE_INITIAL_SIZE		1024
+
+// the largest answer of the auth service, a larger one fails the request
+#ifndef AUTH_RESPONSE_MAX_SIZE
+#define AUTH_RESPONSE_MAX_SIZE			65536
+#endif
 
 // limits for a request to the auth service,
 // so a slow or hung auth service can not block the caller's thread forever;
@@ -51,15 +58,20 @@ typedef struct AuthRequest {
 
 	char body[AUTH_REQUEST_SIZE];
 	size_t body_len;
-	
-	char response[AUTH_RESPONSE_SIZE];
-	size_t response_ptr;
+
+	// the answer of the auth service, NUL terminated, NULL before it answered
+	char *response;
+	size_t response_len;
+	size_t response_size;
 
 } AuthRequest;
 
 AUTH_PRIVATE void *auth_request_new (void);
 
 AUTH_PRIVATE void auth_request_delete (void *request_ptr);
+
+// releases the answer of the auth service, the request can be sent again
+AUTH_PRIVATE void auth_request_end (AuthRequest *auth_request);
 
 // a request is only sent when its header and its body were complete
 AUTH_PRIVATE bool auth_request_is_valid (const AuthRequest *auth_request);
