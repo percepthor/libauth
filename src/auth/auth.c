@@ -541,19 +541,21 @@ unsigned int percepthor_single_authentication (
 		request, HTTP_HEADER_AUTHORIZATION
 	);
 
-	if (token) {
-		const AuthService *auth_service = (
-			const AuthService *
-		) http_receive->http_cerver->custom_data;
+	// the auth service of the cerver and the auth route of the endpoint,
+	// of its group or of its first API route
+	const AuthService *auth_service = (
+		const AuthService *
+	) http_receive_get_cerver_custom_data (http_receive);
 
-		const AuthRoute *auth_route = (
-			const AuthRoute *
-		) http_receive->route->custom_data;
+	const AuthRoute *auth_route = (
+		const AuthRoute *
+	) http_receive_get_route_custom_data (http_receive);
 
+	if (token && auth_service && auth_route && resource) {
 		AuthRequest auth_request = { 0 };
 		auth_request_create_single_permissions (
 			&auth_request, token->str, auth_service->service_name,
-			auth_route->permissions_type, resource, auth_route->action
+			auth_route->permissions_type, resource, auth_route->permissions_action
 		);
 
 		PercepthorAuth *percepthor_auth = percepthor_auth_create (PERCEPTHOR_AUTH_TYPE_PERMISSIONS);
@@ -562,7 +564,9 @@ unsigned int percepthor_single_authentication (
 			percepthor_auth->permissions_type = auth_route->permissions_type;
 
 			(void) snprintf (percepthor_auth->resource, AUTH_RESOURCE_SIZE, "%s", resource);
-			(void) snprintf (percepthor_auth->action, AUTH_ACTION_SIZE, "%s", auth_route->action);
+			(void) snprintf (
+				percepthor_auth->action, AUTH_ACTION_SIZE, "%s", auth_route->permissions_action
+			);
 		}
 
 		retval = percepthor_auth_request_handle (
@@ -575,7 +579,7 @@ unsigned int percepthor_single_authentication (
 	else {
 		cerver_log_error (
 			"percepthor_single_authentication () "
-			"Failed to get token from request's \"Authorization\" header!"
+			"Missing the token, the auth service, the auth route or the resource!"
 		);
 	}
 	#endif
@@ -673,15 +677,17 @@ unsigned int percepthor_custom_authentication_handler (
 		request, HTTP_HEADER_AUTHORIZATION
 	);
 
-	if (token) {
-		const AuthService *auth_service = (
-			const AuthService *
-		) http_receive->http_cerver->custom_data;
+	// the auth service of the cerver and the auth route of the endpoint,
+	// of its group or of its first API route
+	const AuthService *auth_service = (
+		const AuthService *
+	) http_receive_get_cerver_custom_data (http_receive);
 
-		const AuthRoute *auth_route = (
-			const AuthRoute *
-		) http_receive->route->custom_data;
+	const AuthRoute *auth_route = (
+		const AuthRoute *
+	) http_receive_get_route_custom_data (http_receive);
 
+	if (token && auth_service && auth_route) {
 		retval = percepthor_custom_authentication_route (
 			request, token, auth_service, auth_route
 		);
@@ -690,8 +696,8 @@ unsigned int percepthor_custom_authentication_handler (
 	#ifdef PERCEPTHOR_DEBUG
 	else {
 		cerver_log_error (
-			"percepthor_custom_auth () "
-			"Failed to get token from request's \"Authorization\" header!"
+			"percepthor_custom_authentication_handler () "
+			"Missing the token, the auth service or the auth route!"
 		);
 	}
 	#endif
