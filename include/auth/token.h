@@ -6,6 +6,11 @@
 #include "auth/config.h"
 #include "auth/types.h"
 
+/**
+ * @file token.h
+ * @brief The values of the token of an authenticated request, as the auth service answers them.
+ */
+
 #define AUTH_TOKEN_USERNAME_SIZE		128
 
 #ifdef __cplusplus
@@ -19,6 +24,7 @@ extern "C" {
 	XX(3,  QUANTITY,  		Quantity)		\
 	XX(4,  USER,			User)
 
+/** @brief The type of a token, a value that is not one of these is read as NONE. */
 typedef enum PercepthorTokenType {
 
 	#define XX(num, name, string) PERCEPTHOR_TOKEN_TYPE_##name = num,
@@ -27,10 +33,18 @@ typedef enum PercepthorTokenType {
 
 } PercepthorTokenType;
 
+/**
+ * @brief Returns the name of a token type.
+ * @param type The type.
+ * @return A static string, "None" for an unknown type.
+ */
 AUTH_PUBLIC const char *percepthor_token_type_to_string (
 	const PercepthorTokenType type
 );
 
+/**
+ * @brief The values of a token; a value longer than its buffer is truncated.
+ */
 typedef struct AuthToken {
 
 	char id[AUTH_ID_SIZE];
@@ -47,6 +61,10 @@ typedef struct AuthToken {
 
 } AuthToken;
 
+/**
+ * @brief Prints the values of a token.
+ * @param auth_token The token, NULL does nothing.
+ */
 AUTH_PUBLIC void percepthor_token_print (const AuthToken *auth_token);
 
 #ifdef __cplusplus
