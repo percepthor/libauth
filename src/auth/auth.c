@@ -501,6 +501,11 @@ static unsigned int percepthor_auth_request_handle (
 	unsigned int retval = 1;
 
 	if (percepthor_auth) {
+		// the auth service knows which client and which request it authenticates
+		auth_request_set_client (
+			auth_request, http_request_get_client_ip (request), http_request_get_id (request)
+		);
+
 		if (
 			!auth_request_authentication (auth_service_address, auth_request)
 			&& !percepthor_auth_handle_response (percepthor_auth, auth_request->response)

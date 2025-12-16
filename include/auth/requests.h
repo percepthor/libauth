@@ -19,6 +19,12 @@
 #define AUTH_RESPONSE_MAX_SIZE			65536
 #endif
 
+// "X-Forwarded-For: " and the longest address of a client, an IPv6 with its zone
+#define AUTH_FORWARDED_HEADER_SIZE		128
+
+// "X-Request-Id: " and the longest request id of cerver
+#define AUTH_REQUEST_ID_HEADER_SIZE		128
+
 // limits for a request to the auth service,
 // so a slow or hung auth service can not block the caller's thread forever;
 // the test build lowers them to keep the slow auth service cases short
@@ -55,6 +61,11 @@ typedef struct AuthRequest {
 
 	char auth_header[AUTH_HEADER_SIZE];
 	size_t auth_header_len;
+
+	// the client of the request that is authenticated and its id,
+	// "" when they are not known, then the header is not sent
+	char forwarded_header[AUTH_FORWARDED_HEADER_SIZE];
+	char request_id_header[AUTH_REQUEST_ID_HEADER_SIZE];
 
 	char body[AUTH_REQUEST_SIZE];
 	size_t body_len;
@@ -106,6 +117,13 @@ AUTH_PRIVATE void auth_request_create_single_permissions (
 AUTH_PRIVATE void auth_request_create_management_permissions (
 	AuthRequest *auth_request, const char *token, const char *source,
 	const PermissionsType permissions_type, const char *permissions_action
+);
+
+// the auth service receives the address of the client (X-Forwarded-For)
+// and the id of the request (X-Request-Id) that it authenticates,
+// an empty or a NULL value is not sent
+AUTH_PRIVATE void auth_request_set_client (
+	AuthRequest *auth_request, const char *client_ip, const char *request_id
 );
 
 AUTH_PUBLIC RequestResult auth_request_authentication (

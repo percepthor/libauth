@@ -17,6 +17,8 @@
 #include "auth/requests.h"
 
 static const char *auth_header_prefix = { "Authorization: " };
+static const char *auth_forwarded_header_prefix = { "X-Forwarded-For: " };
+static const char *auth_request_id_header_prefix = { "X-Request-Id: " };
 
 // curl_easy_init () calls curl_global_init () implicitly when needed,
 // which is not thread safe, so the global init is done exactly once
@@ -98,6 +100,38 @@ static void auth_request_header (AuthRequest *auth_request, const char *token) {
 		if ((written > 0) && (written < AUTH_HEADER_SIZE)) {
 			auth_request->auth_header_len = (size_t) written;
 		}
+	}
+
+}
+
+// a header that does not fit is left empty, so it is never sent truncated
+static void auth_request_optional_header (
+	char *header, const size_t size, const char *prefix, const char *value
+) {
+
+	header[0] = '\0';
+
+	if (value && value[0]) {
+		const int written = snprintf (header, size, "%s%s", prefix, value);
+		if ((written < 0) || ((size_t) written >= size)) header[0] = '\0';
+	}
+
+}
+
+void auth_request_set_client (
+	AuthRequest *auth_request, const char *client_ip, const char *request_id
+) {
+
+	if (auth_request) {
+		auth_request_optional_header (
+			auth_request->forwarded_header, AUTH_FORWARDED_HEADER_SIZE,
+			auth_forwarded_header_prefix, client_ip
+		);
+
+		auth_request_optional_header (
+			auth_request->request_id_header, AUTH_REQUEST_ID_HEADER_SIZE,
+			auth_request_id_header_prefix, request_id
+		);
 	}
 
 }
@@ -363,7 +397,8 @@ static size_t auth_request_authentication_write_cb (
 
 }
 
-// the Authorization header, NULL when it could not be added: the list is never sent incomplete
+// the Authorization header and the optional ones of the client and the request id,
+// NULL when a header could not be added: the list is never sent incomplete
 static struct curl_slist *auth_request_headers_append (
 	struct curl_slist *headers, const char *header
 ) {
@@ -379,7 +414,17 @@ static struct curl_slist *auth_request_headers_append (
 
 static struct curl_slist *auth_request_headers (const AuthRequest *auth_request) {
 
-	return auth_request_headers_append (NULL, auth_request->auth_header);
+	struct curl_slist *headers = auth_request_headers_append (NULL, auth_request->auth_header);
+
+	if (headers && auth_request->forwarded_header[0]) {
+		headers = auth_request_headers_append (headers, auth_request->forwarded_header);
+	}
+
+	if (headers && auth_request->request_id_header[0]) {
+		headers = auth_request_headers_append (headers, auth_request->request_id_header);
+	}
+
+	return headers;
 
 }
 
