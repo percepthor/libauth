@@ -588,6 +588,35 @@ unsigned int percepthor_single_authentication (
 
 }
 
+// the auth service needs the id of the service to check a route of a service,
+// an AuthService created without it is always answered with a 400,
+// so the request is rejected here without being sent
+static PercepthorAuth *percepthor_custom_authentication_service (
+	AuthRequest *auth_request, const String *token, const AuthService *auth_service
+) {
+
+	PercepthorAuth *percepthor_auth = NULL;
+
+	if (auth_service->service_id[0]) {
+		auth_request_create_service (
+			auth_request, token->str,
+			auth_service->service_name, auth_service->service_id
+		);
+
+		percepthor_auth = percepthor_auth_create (PERCEPTHOR_AUTH_TYPE_SERVICE);
+	}
+
+	else {
+		cerver_log_error (
+			"The auth service of %s has no service id, its service routes are rejected!",
+			auth_service->service_name
+		);
+	}
+
+	return percepthor_auth;
+
+}
+
 static unsigned int percepthor_custom_authentication_route (
 	const HttpRequest *request, const String *token,
 	const AuthService *auth_service, const AuthRoute *auth_route
@@ -628,12 +657,9 @@ static unsigned int percepthor_custom_authentication_route (
 			break;
 
 		case PERCEPTHOR_AUTH_TYPE_SERVICE:
-			auth_request_create_service (
-				&auth_request, token->str,
-				auth_service->service_name, auth_service->service_id
+			percepthor_auth = percepthor_custom_authentication_service (
+				&auth_request, token, auth_service
 			);
-
-			percepthor_auth = percepthor_auth_create (PERCEPTHOR_AUTH_TYPE_SERVICE);
 			break;
 
 		case PERCEPTHOR_AUTH_TYPE_PERMISSIONS:
