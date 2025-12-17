@@ -36,6 +36,11 @@ DEFINES		:= -D _GNU_SOURCE
 
 DEVELOPMENT	:= -D PERCEPTHOR_DEBUG
 
+# the test build lowers the timeouts of a request to the auth service,
+# so the cases of a slow auth service do not take half a minute each,
+# and the largest answer, so the stub can answer one that does not fit
+TESTLIMITS	:= -D AUTH_REQUEST_CONNECT_TIMEOUT=2 -D AUTH_REQUEST_TIMEOUT=2 -D AUTH_RESPONSE_MAX_SIZE=4096
+
 # only the AUTH_EXPORT and AUTH_PUBLIC functions are exported by the library
 VISIBILITY	:= -fvisibility=hidden
 
@@ -71,7 +76,7 @@ CFLAGS      := $(DEFINES)
 ifeq ($(TYPE), development)
 	CFLAGS += -g -fasynchronous-unwind-tables $(DEVELOPMENT)
 else ifeq ($(TYPE), test)
-	CFLAGS += -g -fasynchronous-unwind-tables -D_FORTIFY_SOURCE=2 -fstack-protector -O2
+	CFLAGS += -g -fasynchronous-unwind-tables -D_FORTIFY_SOURCE=2 -fstack-protector -O2 $(TESTLIMITS)
 	ifeq ($(COVERAGE), 1)
 		CFLAGS += -fprofile-arcs -ftest-coverage
 	endif
@@ -138,13 +143,13 @@ $(BUILDDIR)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)
 	@sed -e 's/.*://' -e 's/\\$$//' < $(BUILDDIR)/$*.$(DEPEXT).tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $(BUILDDIR)/$*.$(DEPEXT)
 	@rm -f $(BUILDDIR)/$*.$(DEPEXT).tmp
 
-# tests
+# tests: every file of test/unit/ is a binary, test/integration/ is one binary
 TESTDIR		:= test
 TESTBUILD	:= $(TESTDIR)/objs
 TESTTARGET	:= $(TESTDIR)/bin
 TESTCOVDIR	:= $(COVDIR)/test
 
-TESTFLAGS	:= -g $(DEFINES) -Wall -Wno-unknown-pragmas -Wno-format $(SANITIZERFLAGS)
+TESTFLAGS	:= -g $(DEFINES) $(TESTLIMITS) -Wall -Wno-unknown-pragmas -Wno-format $(SANITIZERFLAGS)
 
 ifeq ($(TYPE), test)
 	ifeq ($(COVERAGE), 1)
@@ -156,9 +161,9 @@ ifeq ($(NATIVE), 1)
 	TESTFLAGS += -march=native
 endif
 
-TESTLIBS	:= -L /usr/local/lib $(PTHREAD)
-
-TESTLIBS += -Wl,-rpath=./$(TARGETDIR) -L ./$(TARGETDIR) -l auth
+# the tests link the objects of the library, so they also reach its AUTH_PRIVATE functions,
+# that libauth.so does not export
+TESTLIBS	:= $(OBJECTS) -L /usr/local/lib $(PTHREAD) $(CURL) $(CERVER) $(SANITIZERFLAGS)
 
 ifeq ($(TYPE), test)
 	ifeq ($(COVERAGE), 1)
@@ -166,29 +171,37 @@ ifeq ($(TYPE), test)
 	endif
 endif
 
-TESTINC		:= -I $(INCDIR) -I ./$(TESTDIR)
+TESTINC		:= -I $(INCDIR) -I ./$(TESTDIR) $(CERVER_INC)
 
-TESTS		:= $(shell find $(TESTDIR) -type f -name *.$(SRCEXT))
-TESTOBJS	:= $(patsubst $(TESTDIR)/%,$(TESTBUILD)/%,$(TESTS:.$(SRCEXT)=.$(OBJEXT)))
+UNITS		:= $(shell find $(TESTDIR)/unit -type f -name *.$(SRCEXT) 2> /dev/null)
+INTEGRATION	:= $(shell find $(TESTDIR)/integration -type f -name *.$(SRCEXT) 2> /dev/null)
 
-TESTCOVS	:= $(patsubst $(TESTDIR)/%,$(TESTBUILD)/%,$(TESTS:.$(SRCEXT)=.$(SRCEXT).$(COVEXT)))
+UNITOBJS	:= $(patsubst $(TESTDIR)/%,$(TESTBUILD)/%,$(UNITS:.$(SRCEXT)=.$(OBJEXT)))
+INTEGRATIONOBJS	:= $(patsubst $(TESTDIR)/%,$(TESTBUILD)/%,$(INTEGRATION:.$(SRCEXT)=.$(OBJEXT)))
 
-integration: testout $(TESTOBJS)
-	$(CC) $(TESTINC) ./$(TESTBUILD)/logs.o -o ./$(TESTTARGET)/logs $(TESTLIBS)
-	$(CC) $(TESTINC) ./$(TESTBUILD)/test.o -o ./$(TESTTARGET)/test $(TESTLIBS)
+TESTOBJS	:= $(UNITOBJS) $(INTEGRATIONOBJS)
+
+TESTCOVS	:= $(patsubst $(TESTDIR)/%,$(TESTBUILD)/%,$(UNITS:.$(SRCEXT)=.$(SRCEXT).$(COVEXT)))
+
+units: testout $(OBJECTS) $(UNITOBJS)
+	$(foreach unit,$(UNITOBJS),$(CC) $(TESTINC) $(unit) -o ./$(TESTTARGET)/$(basename $(notdir $(unit))) $(TESTLIBS) || exit 1;)
+
+integration: testout $(OBJECTS) $(INTEGRATIONOBJS)
+	$(CC) $(TESTINC) $(INTEGRATIONOBJS) -o ./$(TESTTARGET)/integration $(TESTLIBS)
 
 testout:
 	@mkdir -p ./$(TESTTARGET)
 
 test: testout
 	$(MAKE) $(TESTOBJS)
+	$(MAKE) units
 	$(MAKE) integration
 
 # compile tests
 $(TESTBUILD)/%.$(OBJEXT): $(TESTDIR)/%.$(SRCEXT)
 	@mkdir -p $(dir $@)
-	$(CC) $(TESTFLAGS) $(TESTINC) $(TESTLIBS) -c -o $@ $<
-	@$(CC) $(TESTFLAGS) $(INCDEP) -MM $(TESTDIR)/$*.$(SRCEXT) > $(TESTBUILD)/$*.$(DEPEXT)
+	$(CC) $(TESTFLAGS) $(TESTINC) -c -o $@ $<
+	@$(CC) $(TESTFLAGS) $(TESTINC) -MM $(TESTDIR)/$*.$(SRCEXT) > $(TESTBUILD)/$*.$(DEPEXT)
 	@cp -f $(TESTBUILD)/$*.$(DEPEXT) $(TESTBUILD)/$*.$(DEPEXT).tmp
 	@sed -e 's|.*:|$(TESTBUILD)/$*.$(OBJEXT):|' < $(TESTBUILD)/$*.$(DEPEXT).tmp > $(TESTBUILD)/$*.$(DEPEXT)
 	@sed -e 's/.*://' -e 's/\\$$//' < $(TESTBUILD)/$*.$(DEPEXT).tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $(TESTBUILD)/$*.$(DEPEXT)
@@ -213,4 +226,4 @@ clean-tests:
 	@$(RM) -rf $(TESTBUILD)
 	@$(RM) -rf $(TESTTARGET)
 
-.PHONY: all clean test coverage
+.PHONY: all clean clear test units integration coverage
