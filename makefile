@@ -207,6 +207,28 @@ $(TESTBUILD)/%.$(OBJEXT): $(TESTDIR)/%.$(SRCEXT)
 	@sed -e 's/.*://' -e 's/\\$$//' < $(TESTBUILD)/$*.$(DEPEXT).tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $(TESTBUILD)/$*.$(DEPEXT)
 	@rm -f $(TESTBUILD)/$*.$(DEPEXT).tmp
 
+# fuzzing with libFuzzer: make TYPE=test CC=clang fuzz
+FUZZDIR			:= $(TESTDIR)/fuzz
+FUZZBUILD		:= $(BUILDDIR)/fuzz
+FUZZTARGET		:= $(TESTTARGET)/fuzz
+
+FUZZSANITIZERS	:= address,undefined
+FUZZLIBFLAGS	:= -g -O1 $(DEFINES) -fno-omit-frame-pointer -fsanitize=fuzzer-no-link,$(FUZZSANITIZERS)
+FUZZFLAGS		:= -g -O1 $(DEFINES) -fno-omit-frame-pointer -fsanitize=fuzzer,$(FUZZSANITIZERS)
+FUZZLIBS		:= -L /usr/local/lib $(PTHREAD) $(MATH) $(OPENSSL) $(CURL) $(CERVER)
+FUZZINC			:= -I $(INCDIR) -I ./$(TESTDIR) $(CERVER_INC)
+
+FUZZERS			:= $(shell find $(FUZZDIR) -maxdepth 1 -type f -name *.$(SRCEXT) 2> /dev/null)
+FUZZLIBOBJS		:= $(patsubst $(SRCDIR)/%,$(FUZZBUILD)/%,$(SOURCES:.$(SRCEXT)=.$(OBJEXT)))
+
+fuzz: $(FUZZLIBOBJS)
+	@mkdir -p ./$(FUZZTARGET)
+	$(foreach fuzzer,$(FUZZERS),$(CC) $(FUZZFLAGS) $(FUZZINC) $(fuzzer) $(FUZZLIBOBJS) -o ./$(FUZZTARGET)/$(basename $(notdir $(fuzzer))) $(FUZZLIBS) || exit 1;)
+
+$(FUZZBUILD)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)
+	@mkdir -p $(dir $@)
+	$(CC) $(FUZZLIBFLAGS) $(INC) -c -o $@ $<
+
 # coverage of the library from a TYPE=test COVERAGE=1 build after running the tests
 coverage:
 	@mkdir -p $(COVDIR)
@@ -226,4 +248,4 @@ clean-tests:
 	@$(RM) -rf $(TESTBUILD)
 	@$(RM) -rf $(TESTTARGET)
 
-.PHONY: all clean clear test units integration coverage
+.PHONY: all clean clear test units integration fuzz coverage
