@@ -1,0 +1,68 @@
+name: LibAuth Nightly
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+env:
+  CERVER_REPOSITORY: ermiry/cerver
+  CERVER_REF: 2.0b-64
+
+jobs:
+  repeat:
+    name: LibAuth flaky hunter with thread sanitizer
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout Cerver
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CERVER_REPOSITORY }}
+          ref: ${{ env.CERVER_REF }}
+          path: .cerver
+
+      - name: Move Cerver out of the workspace
+        run: mv .cerver "${RUNNER_TEMP}/cerver"
+
+      - name: Disable address randomization
+        run: sudo sysctl vm.mmap_rnd_bits=28
+
+      - name: Integration
+        env:
+          CERVER_DIR: ${{ runner.temp }}/cerver
+          SANITIZER: thread
+        run: bash test/repeat.sh test/bin/integration 20
+
+  fuzz:
+    name: LibAuth long fuzzing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout Cerver
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CERVER_REPOSITORY }}
+          ref: ${{ env.CERVER_REF }}
+          path: .cerver
+
+      - name: Move Cerver out of the workspace
+        run: mv .cerver "${RUNNER_TEMP}/cerver"
+
+      - name: Fuzzing
+        env:
+          CERVER_DIR: ${{ runner.temp }}/cerver
+          SECONDS_PER_TARGET: 300
+        run: bash test/fuzz.sh
+
+      - name: Upload crashes
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts
+          path: ./fuzz-artifacts/
+          retention-days: 14
