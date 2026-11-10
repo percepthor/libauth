@@ -29,27 +29,31 @@ AuthService *auth_service_create (
 
 	AuthService *auth_service = auth_service_new ();
 	if (auth_service) {
+		// the lengths are the ones of the stored values, after any truncation
 		if (service_id) {
-			auth_service->service_id_len = snprintf (
-				auth_service->service_id,
-				AUTH_SERVICE_ID_SIZE,
-				"%s", service_id
+			(void) snprintf (
+				auth_service->service_id, AUTH_SERVICE_ID_SIZE, "%s", service_id
 			);
+
+			auth_service->service_id_len = (int) strlen (auth_service->service_id);
 		}
 
 		if (service_name) {
-			auth_service->service_name_len = snprintf (
-				auth_service->service_name,
-				AUTH_SERVICE_NAME_SIZE,
-				"%s", service_name
+			(void) snprintf (
+				auth_service->service_name, AUTH_SERVICE_NAME_SIZE, "%s", service_name
 			);
+
+			auth_service->service_name_len = (int) strlen (auth_service->service_name);
 		}
 
 		if (auth_service_address) {
-			auth_service->auth_service_address_len = snprintf (
-				auth_service->auth_service_address,
-				AUTH_SERVICE_ADDRESS_SIZE,
+			(void) snprintf (
+				auth_service->auth_service_address, AUTH_SERVICE_ADDRESS_SIZE,
 				"%s", auth_service_address
+			);
+
+			auth_service->auth_service_address_len = (int) strlen (
+				auth_service->auth_service_address
 			);
 		}
 	}
@@ -59,6 +63,8 @@ AuthService *auth_service_create (
 }
 
 void auth_service_print (const AuthService *auth_service) {
+
+	if (!auth_service) return;
 
 	(void) printf ("Auth Service:\n");
 
@@ -78,7 +84,7 @@ void auth_service_print (const AuthService *auth_service) {
 
 	if (auth_service->auth_service_address_len) {
 		(void) printf (
-			"\tDescription [%d]: %s\n\n",
+			"\tAddress [%d]: %s\n\n",
 			auth_service->auth_service_address_len, auth_service->auth_service_address
 		);
 	}

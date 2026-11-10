@@ -2,6 +2,10 @@ TYPE		:= development
 
 NATIVE		:= 0
 
+COVERAGE	:= 0
+
+SANITIZER	:=
+
 SLIB		:= libauth.so
 
 all: directories $(SLIB)
@@ -32,6 +36,14 @@ DEFINES		:= -D _GNU_SOURCE
 
 DEVELOPMENT	:= -D PERCEPTHOR_DEBUG
 
+# the test build lowers the timeouts of a request to the auth service,
+# so the cases of a slow auth service do not take half a minute each,
+# and the largest answer, so the stub can answer one that does not fit
+TESTLIMITS	:= -D AUTH_REQUEST_CONNECT_TIMEOUT=2 -D AUTH_REQUEST_TIMEOUT=2 -D AUTH_RESPONSE_MAX_SIZE=4096
+
+# only the AUTH_EXPORT and AUTH_PUBLIC functions are exported by the library
+VISIBILITY	:= -fvisibility=hidden
+
 CC          := gcc
 
 GCCVGTEQ8 	:= $(shell expr `gcc -dumpversion | cut -f1 -d.` \>= 8)
@@ -45,6 +57,9 @@ TARGETDIR   := bin
 SRCEXT      := c
 DEPEXT      := d
 OBJEXT      := o
+
+COVDIR		:= coverage
+COVEXT		:= gcov
 
 # common flags
 # -Wconversion
@@ -61,7 +76,10 @@ CFLAGS      := $(DEFINES)
 ifeq ($(TYPE), development)
 	CFLAGS += -g -fasynchronous-unwind-tables $(DEVELOPMENT)
 else ifeq ($(TYPE), test)
-	CFLAGS += -g -fasynchronous-unwind-tables -D_FORTIFY_SOURCE=2 -fstack-protector -O2
+	CFLAGS += -g -fasynchronous-unwind-tables -D_FORTIFY_SOURCE=2 -fstack-protector -O2 $(TESTLIMITS)
+	ifeq ($(COVERAGE), 1)
+		CFLAGS += -fprofile-arcs -ftest-coverage
+	endif
 else ifeq ($(TYPE), beta)
 	CFLAGS += -g -D_FORTIFY_SOURCE=2 -O2
 else
@@ -69,7 +87,7 @@ else
 endif
 
 # check which compiler we are using
-ifeq ($(CC), g++) 
+ifeq ($(CC), g++)
 	CFLAGS += -std=c++11 -fpermissive
 else
 	CFLAGS += -std=c11 -Wpedantic -pedantic-errors
@@ -85,13 +103,20 @@ ifeq ($(NATIVE), 1)
 	CFLAGS += -march=native
 endif
 
-# common flags
-CFLAGS += -fPIC $(COMMON)
+# address,undefined or thread, for the library and for the tests
+ifneq ($(SANITIZER),)
+	SANITIZERFLAGS := -fsanitize=$(SANITIZER) -fno-omit-frame-pointer
+endif
 
-LIB         := -L /usr/local/lib $(PTHREAD) $(MATH) $(OPENSSL) $(CURL) $(CERVER)
+# common flags
+CFLAGS += -fPIC $(VISIBILITY) $(COMMON) $(SANITIZERFLAGS)
+
+LIB         := -L /usr/local/lib $(PTHREAD) $(MATH) $(OPENSSL) $(CURL) $(CERVER) $(SANITIZERFLAGS)
 
 ifeq ($(TYPE), test)
-	LIB += -lgcov --coverage
+	ifeq ($(COVERAGE), 1)
+		LIB += -lgcov --coverage
+	endif
 endif
 
 INC         := -I $(INCDIR) -I /usr/local/include $(CERVER_INC)
@@ -118,13 +143,13 @@ $(BUILDDIR)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)
 	@sed -e 's/.*://' -e 's/\\$$//' < $(BUILDDIR)/$*.$(DEPEXT).tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $(BUILDDIR)/$*.$(DEPEXT)
 	@rm -f $(BUILDDIR)/$*.$(DEPEXT).tmp
 
-# tests
+# tests: every file of test/unit/ is a binary, test/integration/ is one binary
 TESTDIR		:= test
 TESTBUILD	:= $(TESTDIR)/objs
 TESTTARGET	:= $(TESTDIR)/bin
 TESTCOVDIR	:= $(COVDIR)/test
 
-TESTFLAGS	:= -g $(DEFINES) -Wall -Wno-unknown-pragmas -Wno-format
+TESTFLAGS	:= -g $(DEFINES) $(TESTLIMITS) -Wall -Wno-unknown-pragmas -Wno-format $(SANITIZERFLAGS)
 
 ifeq ($(TYPE), test)
 	ifeq ($(COVERAGE), 1)
@@ -136,9 +161,9 @@ ifeq ($(NATIVE), 1)
 	TESTFLAGS += -march=native
 endif
 
-TESTLIBS	:= -L /usr/local/lib $(PTHREAD)
-
-TESTLIBS += -Wl,-rpath=./$(TARGETDIR) -L ./$(TARGETDIR) -l auth
+# the tests link the objects of the library, so they also reach its AUTH_PRIVATE functions,
+# that libauth.so does not export
+TESTLIBS	:= $(OBJECTS) -L /usr/local/lib $(PTHREAD) $(CURL) $(CERVER) $(SANITIZERFLAGS)
 
 ifeq ($(TYPE), test)
 	ifeq ($(COVERAGE), 1)
@@ -146,38 +171,75 @@ ifeq ($(TYPE), test)
 	endif
 endif
 
-TESTINC		:= -I $(INCDIR) -I ./$(TESTDIR)
+TESTINC		:= -I $(INCDIR) -I ./$(TESTDIR) $(CERVER_INC)
 
-TESTS		:= $(shell find $(TESTDIR) -type f -name *.$(SRCEXT))
-TESTOBJS	:= $(patsubst $(TESTDIR)/%,$(TESTBUILD)/%,$(TESTS:.$(SRCEXT)=.$(OBJEXT)))
+UNITS		:= $(shell find $(TESTDIR)/unit -type f -name *.$(SRCEXT) 2> /dev/null)
+INTEGRATION	:= $(shell find $(TESTDIR)/integration -type f -name *.$(SRCEXT) 2> /dev/null)
 
-TESTCOVS	:= $(patsubst $(TESTDIR)/%,$(TESTBUILD)/%,$(TESTS:.$(SRCEXT)=.$(SRCEXT).$(COVEXT)))
+UNITOBJS	:= $(patsubst $(TESTDIR)/%,$(TESTBUILD)/%,$(UNITS:.$(SRCEXT)=.$(OBJEXT)))
+INTEGRATIONOBJS	:= $(patsubst $(TESTDIR)/%,$(TESTBUILD)/%,$(INTEGRATION:.$(SRCEXT)=.$(OBJEXT)))
 
-integration: testout $(TESTOBJS)
-	$(CC) $(TESTINC) ./$(TESTBUILD)/logs.o -o ./$(TESTTARGET)/logs $(TESTLIBS)
-	$(CC) $(TESTINC) ./$(TESTBUILD)/test.o -o ./$(TESTTARGET)/test $(TESTLIBS)
+TESTOBJS	:= $(UNITOBJS) $(INTEGRATIONOBJS)
+
+TESTCOVS	:= $(patsubst $(TESTDIR)/%,$(TESTBUILD)/%,$(UNITS:.$(SRCEXT)=.$(SRCEXT).$(COVEXT)))
+
+units: testout $(OBJECTS) $(UNITOBJS)
+	$(foreach unit,$(UNITOBJS),$(CC) $(TESTINC) $(unit) -o ./$(TESTTARGET)/$(basename $(notdir $(unit))) $(TESTLIBS) || exit 1;)
+
+integration: testout $(OBJECTS) $(INTEGRATIONOBJS)
+	$(CC) $(TESTINC) $(INTEGRATIONOBJS) -o ./$(TESTTARGET)/integration $(TESTLIBS)
 
 testout:
 	@mkdir -p ./$(TESTTARGET)
 
 test: testout
 	$(MAKE) $(TESTOBJS)
+	$(MAKE) units
 	$(MAKE) integration
 
 # compile tests
 $(TESTBUILD)/%.$(OBJEXT): $(TESTDIR)/%.$(SRCEXT)
 	@mkdir -p $(dir $@)
-	$(CC) $(TESTFLAGS) $(TESTINC) $(TESTLIBS) -c -o $@ $<
-	@$(CC) $(TESTFLAGS) $(INCDEP) -MM $(TESTDIR)/$*.$(SRCEXT) > $(TESTBUILD)/$*.$(DEPEXT)
+	$(CC) $(TESTFLAGS) $(TESTINC) -c -o $@ $<
+	@$(CC) $(TESTFLAGS) $(TESTINC) -MM $(TESTDIR)/$*.$(SRCEXT) > $(TESTBUILD)/$*.$(DEPEXT)
 	@cp -f $(TESTBUILD)/$*.$(DEPEXT) $(TESTBUILD)/$*.$(DEPEXT).tmp
 	@sed -e 's|.*:|$(TESTBUILD)/$*.$(OBJEXT):|' < $(TESTBUILD)/$*.$(DEPEXT).tmp > $(TESTBUILD)/$*.$(DEPEXT)
 	@sed -e 's/.*://' -e 's/\\$$//' < $(TESTBUILD)/$*.$(DEPEXT).tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $(TESTBUILD)/$*.$(DEPEXT)
 	@rm -f $(TESTBUILD)/$*.$(DEPEXT).tmp
 
+# fuzzing with libFuzzer: make TYPE=test CC=clang fuzz
+FUZZDIR			:= $(TESTDIR)/fuzz
+FUZZBUILD		:= $(BUILDDIR)/fuzz
+FUZZTARGET		:= $(TESTTARGET)/fuzz
+
+FUZZSANITIZERS	:= address,undefined
+FUZZLIBFLAGS	:= -g -O1 $(DEFINES) -fno-omit-frame-pointer -fsanitize=fuzzer-no-link,$(FUZZSANITIZERS)
+FUZZFLAGS		:= -g -O1 $(DEFINES) -fno-omit-frame-pointer -fsanitize=fuzzer,$(FUZZSANITIZERS)
+FUZZLIBS		:= -L /usr/local/lib $(PTHREAD) $(MATH) $(OPENSSL) $(CURL) $(CERVER)
+FUZZINC			:= -I $(INCDIR) -I ./$(TESTDIR) $(CERVER_INC)
+
+FUZZERS			:= $(shell find $(FUZZDIR) -maxdepth 1 -type f -name *.$(SRCEXT) 2> /dev/null)
+FUZZLIBOBJS		:= $(patsubst $(SRCDIR)/%,$(FUZZBUILD)/%,$(SOURCES:.$(SRCEXT)=.$(OBJEXT)))
+
+fuzz: $(FUZZLIBOBJS)
+	@mkdir -p ./$(FUZZTARGET)
+	$(foreach fuzzer,$(FUZZERS),$(CC) $(FUZZFLAGS) $(FUZZINC) $(fuzzer) $(FUZZLIBOBJS) -o ./$(FUZZTARGET)/$(basename $(notdir $(fuzzer))) $(FUZZLIBS) || exit 1;)
+
+$(FUZZBUILD)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)
+	@mkdir -p $(dir $@)
+	$(CC) $(FUZZLIBFLAGS) $(INC) -c -o $@ $<
+
+# coverage of the library from a TYPE=test COVERAGE=1 build after running the tests
+coverage:
+	@mkdir -p $(COVDIR)
+	gcov -o $(BUILDDIR)/auth $(SOURCES) > /dev/null
+	@mv *.$(COVEXT) $(COVDIR)/ 2> /dev/null || true
+
 clear: clean-objects clean-tests
 
 clean: clear
 	@$(RM) -rf $(TARGETDIR)
+	@$(RM) -rf $(COVDIR)
 
 clean-objects:
 	@$(RM) -rf $(BUILDDIR)
@@ -186,4 +248,4 @@ clean-tests:
 	@$(RM) -rf $(TESTBUILD)
 	@$(RM) -rf $(TESTTARGET)
 
-.PHONY: all clean test
+.PHONY: all clean clear test units integration fuzz coverage

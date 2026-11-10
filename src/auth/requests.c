@@ -1,7 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
+
+#include <pthread.h>
 
 #include <curl/curl.h>
+
+#include <cerver/http/json/json.h>
 
 #ifdef PERCEPTHOR_DEBUG
 #include <cerver/utils/log.h>
@@ -10,6 +15,20 @@
 #include "auth/auth.h"
 #include "auth/permissions.h"
 #include "auth/requests.h"
+
+static const char *auth_header_prefix = { "Authorization: " };
+static const char *auth_forwarded_header_prefix = { "X-Forwarded-For: " };
+static const char *auth_request_id_header_prefix = { "X-Request-Id: " };
+
+// curl_easy_init () calls curl_global_init () implicitly when needed,
+// which is not thread safe, so the global init is done exactly once
+static pthread_once_t auth_request_curl_once = PTHREAD_ONCE_INIT;
+
+static void auth_request_curl_global_init (void) {
+
+	(void) curl_global_init (CURL_GLOBAL_DEFAULT);
+
+}
 
 const char *request_result_to_string (const RequestResult type) {
 
@@ -34,11 +53,171 @@ void *auth_request_new (void) {
 
 }
 
+void auth_request_end (AuthRequest *auth_request) {
+
+	if (auth_request) {
+		free (auth_request->response);
+
+		auth_request->response = NULL;
+		auth_request->response_len = 0;
+		auth_request->response_size = 0;
+	}
+
+}
+
 void auth_request_delete (void *request_ptr) {
 
 	if (request_ptr) {
+		auth_request_end ((AuthRequest *) request_ptr);
+
 		free (request_ptr);
 	}
+
+}
+
+// a request is only valid when its header and its body were complete,
+// a truncated one is never sent to the auth service
+bool auth_request_is_valid (const AuthRequest *auth_request) {
+
+	return auth_request
+		&& (auth_request->auth_header_len > 0)
+		&& (auth_request->body_len > 0);
+
+}
+
+static void auth_request_header (AuthRequest *auth_request, const char *token) {
+
+	if (!auth_request) return;
+
+	auth_request->auth_header_len = 0;
+
+	if (token) {
+		const int written = snprintf (
+			auth_request->auth_header, AUTH_HEADER_SIZE,
+			"%s%s", auth_header_prefix, token
+		);
+
+		if ((written > 0) && (written < AUTH_HEADER_SIZE)) {
+			auth_request->auth_header_len = (size_t) written;
+		}
+	}
+
+}
+
+// a header that does not fit is left empty, so it is never sent truncated
+static void auth_request_optional_header (
+	char *header, const size_t size, const char *prefix, const char *value
+) {
+
+	header[0] = '\0';
+
+	if (value && value[0]) {
+		const int written = snprintf (header, size, "%s%s", prefix, value);
+		if ((written < 0) || ((size_t) written >= size)) header[0] = '\0';
+	}
+
+}
+
+void auth_request_set_client (
+	AuthRequest *auth_request, const char *client_ip, const char *request_id
+) {
+
+	if (auth_request) {
+		auth_request_optional_header (
+			auth_request->forwarded_header, AUTH_FORWARDED_HEADER_SIZE,
+			auth_forwarded_header_prefix, client_ip
+		);
+
+		auth_request_optional_header (
+			auth_request->request_id_header, AUTH_REQUEST_ID_HEADER_SIZE,
+			auth_request_id_header_prefix, request_id
+		);
+	}
+
+}
+
+// adds a string to the body; a missing or empty value is left out
+static bool auth_request_body_add_string (
+	json_t *body, const char *key, const char *value
+) {
+
+	bool added = true;
+
+	if (value && value[0]) {
+		// json_string () fails on a value that is not valid UTF-8
+		added = !json_object_set_new (body, key, json_string (value));
+	}
+
+	return added;
+
+}
+
+static bool auth_request_body_add_integer (
+	json_t *body, const char *key, const json_int_t value
+) {
+
+	return !json_object_set_new (body, key, json_integer (value));
+
+}
+
+// the base of every body, with the auth type and the source service
+static json_t *auth_request_body_create (
+	const PercepthorAuthType type, const char *source, bool *valid
+) {
+
+	json_t *body = json_object ();
+	if (body) {
+		*valid = auth_request_body_add_integer (body, "type", type)
+			&& auth_request_body_add_string (body, "source", source);
+	}
+
+	else {
+		*valid = false;
+	}
+
+	return body;
+
+}
+
+// the values are escaped by the serializer, so a quote in a resource
+// can not add or overwrite a field of the request to the auth service
+static void auth_request_body_dump (
+	AuthRequest *auth_request, json_t *body, const bool valid
+) {
+
+	if (!auth_request) {
+		if (body) json_decref (body);
+
+		return;
+	}
+
+	auth_request->body_len = 0;
+	auth_request->body[0] = '\0';
+
+	if (body && valid) {
+		const size_t needed = json_dumpb (
+			body, auth_request->body, AUTH_REQUEST_SIZE - 1, JSON_COMPACT
+		);
+
+		if ((needed > 0) && (needed < AUTH_REQUEST_SIZE)) {
+			auth_request->body[needed] = '\0';
+			auth_request->body_len = needed;
+		}
+
+		else {
+			auth_request->body[0] = '\0';
+
+			#ifdef PERCEPTHOR_DEBUG
+			cerver_log_error (
+				"auth_request_body_dump () - "
+				"a body of %zu bytes does not fit in %d bytes!",
+				needed, AUTH_REQUEST_SIZE
+			);
+			#endif
+		}
+	}
+
+	if (body) json_decref (body);
 
 }
 
@@ -46,19 +225,12 @@ void auth_request_create (
 	AuthRequest *auth_request, const char *token, const char *source
 ) {
 
-	// prepare the request
-	(void) snprintf (
-		auth_request->auth_header, AUTH_HEADER_SIZE,
-		"Authorization: %s", token
-	);
+	auth_request_header (auth_request, token);
 
-	(void) snprintf (
-		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": %d, \"source\": \"%s\" }",
-		PERCEPTHOR_AUTH_TYPE_TOKEN, source
-	);
+	bool valid = false;
+	json_t *body = auth_request_body_create (PERCEPTHOR_AUTH_TYPE_TOKEN, source, &valid);
 
-	auth_request->body_len = strlen (auth_request->body);
+	auth_request_body_dump (auth_request, body, valid);
 
 }
 
@@ -67,51 +239,36 @@ void auth_request_create_action (
 	const char *source, const char *action
 ) {
 
-	// prepare the request
-	(void) snprintf (
-		auth_request->auth_header, AUTH_HEADER_SIZE,
-		"Authorization: %s", token
-	);
+	auth_request_header (auth_request, token);
 
-	(void) snprintf (
-		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": %d, \"source\": \"%s\", \"action\": \"%s\" }",
-		PERCEPTHOR_AUTH_TYPE_ACTION, source, action
-	);
+	bool valid = false;
+	json_t *body = auth_request_body_create (PERCEPTHOR_AUTH_TYPE_ACTION, source, &valid);
+	if (body) {
+		valid = valid && auth_request_body_add_string (body, "action", action);
+	}
 
-	auth_request->body_len = strlen (auth_request->body);
+	auth_request_body_dump (auth_request, body, valid);
 
 }
 
+// the action of a role is optional, the role is required
 void auth_request_create_role (
 	AuthRequest *auth_request,
 	const char *token, const char *source,
 	const char *action, const char *role
 ) {
 
-	// prepare the request
-	(void) snprintf (
-		auth_request->auth_header, AUTH_HEADER_SIZE,
-		"Authorization: %s", token
-	);
+	auth_request_header (auth_request, token);
 
-	if (action && role) {
-		(void) snprintf (
-			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": %d, \"source\": \"%s\", \"action\": \"%s\", \"role\": \"%s\" }",
-			PERCEPTHOR_AUTH_TYPE_ROLE, source, action, role
-		);
+	bool valid = false;
+	json_t *body = auth_request_body_create (PERCEPTHOR_AUTH_TYPE_ROLE, source, &valid);
+	if (body) {
+		valid = valid
+			&& auth_request_body_add_string (body, "action", action)
+			&& auth_request_body_add_string (body, "role", role);
 	}
 
-	else {
-		(void) snprintf (
-			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": %d, \"action\": None, \"role\": \"%s\" }",
-			PERCEPTHOR_AUTH_TYPE_ROLE, role
-		);
-	}
-
-	auth_request->body_len = strlen (auth_request->body);
+	auth_request_body_dump (auth_request, body, valid);
 
 }
 
@@ -120,19 +277,15 @@ void auth_request_create_service (
 	const char *source, const char *service
 ) {
 
-	// prepare the request
-	(void) snprintf (
-		auth_request->auth_header, AUTH_HEADER_SIZE,
-		"Authorization: %s", token
-	);
+	auth_request_header (auth_request, token);
 
-	(void) snprintf (
-		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": %d, \"source\": \"%s\", \"service\": \"%s\" }",
-		PERCEPTHOR_AUTH_TYPE_SERVICE, source, service
-	);
+	bool valid = false;
+	json_t *body = auth_request_body_create (PERCEPTHOR_AUTH_TYPE_SERVICE, source, &valid);
+	if (body) {
+		valid = valid && auth_request_body_add_string (body, "service", service);
+	}
 
-	auth_request->body_len = strlen (auth_request->body);
+	auth_request_body_dump (auth_request, body, valid);
 
 }
 
@@ -142,22 +295,20 @@ void auth_request_create_single_permissions (
 	const PermissionsType permissions_type,
 	const char *resource, const char *permissions_action
 ) {
-	
-	// prepare the request
-	(void) snprintf (
-		auth_request->auth_header, AUTH_HEADER_SIZE,
-		"Authorization: %s", token
-	);
 
-	(void) snprintf (
-		auth_request->body, AUTH_REQUEST_SIZE,
-		"{ \"type\": %d, \"source\": \"%s\", \"scope\": %d, \"permissions_type\": %u, \"resource\": \"%s\", \"action\": \"%s\" }",
-		PERCEPTHOR_AUTH_TYPE_PERMISSIONS, source,
-		PERCEPTHOR_AUTH_SCOPE_SINGLE, permissions_type,
-		resource, permissions_action
-	);
+	auth_request_header (auth_request, token);
 
-	auth_request->body_len = strlen (auth_request->body);
+	bool valid = false;
+	json_t *body = auth_request_body_create (PERCEPTHOR_AUTH_TYPE_PERMISSIONS, source, &valid);
+	if (body) {
+		valid = valid
+			&& auth_request_body_add_integer (body, "scope", PERCEPTHOR_AUTH_SCOPE_SINGLE)
+			&& auth_request_body_add_integer (body, "permissions_type", permissions_type)
+			&& auth_request_body_add_string (body, "resource", resource)
+			&& auth_request_body_add_string (body, "action", permissions_action);
+	}
+
+	auth_request_body_dump (auth_request, body, valid);
 
 }
 
@@ -166,32 +317,52 @@ void auth_request_create_management_permissions (
 	const PermissionsType permissions_type, const char *permissions_action
 ) {
 
-	// prepare the request
-	(void) snprintf (
-		auth_request->auth_header, AUTH_HEADER_SIZE,
-		"Authorization: %s", token
-	);
+	auth_request_header (auth_request, token);
 
-	if (permissions_action) {
-		(void) snprintf (
-			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": %d, \"source\": \"%s\", \"scope\": %d, \"permissions_type\": %u, \"action\": \"%s\" }",
-			PERCEPTHOR_AUTH_TYPE_PERMISSIONS, source,
-			PERCEPTHOR_AUTH_SCOPE_MANAGEMENT, permissions_type,
-			permissions_action
-		);
+	bool valid = false;
+	json_t *body = auth_request_body_create (PERCEPTHOR_AUTH_TYPE_PERMISSIONS, source, &valid);
+	if (body) {
+		valid = valid
+			&& auth_request_body_add_integer (body, "scope", PERCEPTHOR_AUTH_SCOPE_MANAGEMENT)
+			&& auth_request_body_add_integer (body, "permissions_type", permissions_type)
+			&& auth_request_body_add_string (body, "action", permissions_action);
 	}
 
-	else {
-		(void) snprintf (
-			auth_request->body, AUTH_REQUEST_SIZE,
-			"{ \"type\": %d, \"source\": \"%s\", \"scope\": %d, \"permissions_type\": %u }",
-			PERCEPTHOR_AUTH_TYPE_PERMISSIONS, source,
-			PERCEPTHOR_AUTH_SCOPE_MANAGEMENT, permissions_type
-		);
+	auth_request_body_dump (auth_request, body, valid);
+
+}
+
+// the size of the buffer for an answer of a length and its terminating null byte:
+// it doubles from AUTH_RESPONSE_INITIAL_SIZE, 0 when it would pass AUTH_RESPONSE_MAX_SIZE
+static size_t auth_request_response_size (const size_t current, const size_t needed) {
+
+	size_t size = current ? current : AUTH_RESPONSE_INITIAL_SIZE;
+	while ((size < needed) && (size <= (AUTH_RESPONSE_MAX_SIZE / 2))) {
+		size *= 2;
 	}
 
-	auth_request->body_len = strlen (auth_request->body);
+	return (size >= needed) ? size : 0;
+
+}
+
+// makes room for the answer and its terminating null byte, false when it can not grow
+static bool auth_request_response_reserve (AuthRequest *auth_request, const size_t needed) {
+
+	bool reserved = (auth_request->response && (needed <= auth_request->response_size));
+
+	if (!reserved) {
+		const size_t size = auth_request_response_size (auth_request->response_size, needed);
+		if (size) {
+			char *response = (char *) realloc (auth_request->response, size);
+			if (response) {
+				auth_request->response = response;
+				auth_request->response_size = size;
+				reserved = true;
+			}
+		}
+	}
+
+	return reserved;
 
 }
 
@@ -203,16 +374,62 @@ static size_t auth_request_authentication_write_cb (
 
 	AuthRequest *auth_request = (AuthRequest *) auth_mem;
 
-	char *auth_response_mem = auth_request->response;
-	(void) memcpy (&(auth_response_mem[auth_request->response_ptr]), contents, real_size);
-	auth_request->response_ptr += real_size;
-	auth_response_mem[auth_request->response_ptr] = 0;
+	// keep room for the terminating null byte;
+	// an answer larger than AUTH_RESPONSE_MAX_SIZE fails the request
+	// (curl gets CURLE_WRITE_ERROR) instead of being read truncated
+	if (!auth_request_response_reserve (auth_request, auth_request->response_len + real_size + 1)) {
+		#ifdef PERCEPTHOR_DEBUG
+		cerver_log_error (
+			"auth_request_authentication_write_cb () - "
+			"an answer of %zu bytes does not fit in %d bytes!",
+			auth_request->response_len + real_size, AUTH_RESPONSE_MAX_SIZE
+		);
+		#endif
+
+		return 0;
+	}
+
+	(void) memcpy (auth_request->response + auth_request->response_len, contents, real_size);
+	auth_request->response_len += real_size;
+	auth_request->response[auth_request->response_len] = '\0';
 
 	return real_size;
 
 }
 
-static RequestResult auth_request_perform (CURL *curl) {
+// the Authorization header and the optional ones of the client and the request id,
+// NULL when a header could not be added: the list is never sent incomplete
+static struct curl_slist *auth_request_headers_append (
+	struct curl_slist *headers, const char *header
+) {
+
+	struct curl_slist *appended = curl_slist_append (headers, header);
+	if (!appended) {
+		curl_slist_free_all (headers);
+	}
+
+	return appended;
+
+}
+
+static struct curl_slist *auth_request_headers (const AuthRequest *auth_request) {
+
+	struct curl_slist *headers = auth_request_headers_append (NULL, auth_request->auth_header);
+
+	if (headers && auth_request->forwarded_header[0]) {
+		headers = auth_request_headers_append (headers, auth_request->forwarded_header);
+	}
+
+	if (headers && auth_request->request_id_header[0]) {
+		headers = auth_request_headers_append (headers, auth_request->request_id_header);
+	}
+
+	return headers;
+
+}
+
+// a 200 without an answer can not be read, so it is a failed request
+static RequestResult auth_request_perform (CURL *curl, const AuthRequest *auth_request) {
 
 	RequestResult result = REQUEST_RESULT_NONE;
 
@@ -243,6 +460,10 @@ static RequestResult auth_request_perform (CURL *curl) {
 		result = REQUEST_RESULT_BAD_STATUS;
 	}
 
+	else if (!auth_request->response) {
+		result = REQUEST_RESULT_FAILED;
+	}
+
 	return result;
 
 }
@@ -252,34 +473,47 @@ RequestResult auth_request_authentication (
 	AuthRequest *auth_request
 ) {
 
-	RequestResult result = REQUEST_RESULT_NONE;
+	RequestResult result = REQUEST_RESULT_FAILED;
 
-	CURL *curl = curl_easy_init ();
-	if (curl) {
-		curl_easy_setopt (curl, CURLOPT_URL, auth_service_address);
+	if (auth_service_address && auth_service_address[0] && auth_request_is_valid (auth_request)) {
+		(void) pthread_once (&auth_request_curl_once, auth_request_curl_global_init);
 
-		// add custom "Authorization" header
-		struct curl_slist *headers = NULL;
+		// a request sent again does not keep the answer of the previous one
+		auth_request_end (auth_request);
 
-		headers = curl_slist_append (headers, auth_request->auth_header);
+		CURL *curl = curl_easy_init ();
+		if (curl) {
+			curl_easy_setopt (curl, CURLOPT_URL, auth_service_address);
 
-		curl_easy_setopt (curl, CURLOPT_HTTPHEADER, headers);
+			// this runs inside a multi threaded server:
+			// never let curl use signals (SIGALRM) for its timeouts,
+			// they interrupt the system calls of other threads (EINTR)
+			curl_easy_setopt (curl, CURLOPT_NOSIGNAL, 1L);
 
-		curl_easy_setopt (curl, CURLOPT_POSTFIELDS, auth_request->body);
-		curl_easy_setopt (curl, CURLOPT_POSTFIELDSIZE, auth_request->body_len);
+			curl_easy_setopt (curl, CURLOPT_CONNECTTIMEOUT, (long) AUTH_REQUEST_CONNECT_TIMEOUT);
+			curl_easy_setopt (curl, CURLOPT_TIMEOUT, (long) AUTH_REQUEST_TIMEOUT);
 
-		curl_easy_setopt (
-			curl, CURLOPT_WRITEFUNCTION,
-			auth_request_authentication_write_cb
-		);
+			struct curl_slist *headers = auth_request_headers (auth_request);
+			if (headers) {
+				curl_easy_setopt (curl, CURLOPT_HTTPHEADER, headers);
 
-		curl_easy_setopt (curl, CURLOPT_WRITEDATA, auth_request);
+				curl_easy_setopt (curl, CURLOPT_POSTFIELDS, auth_request->body);
+				curl_easy_setopt (curl, CURLOPT_POSTFIELDSIZE, (long) auth_request->body_len);
 
-		result = auth_request_perform (curl);
+				curl_easy_setopt (
+					curl, CURLOPT_WRITEFUNCTION,
+					auth_request_authentication_write_cb
+				);
 
-		curl_slist_free_all (headers);
+				curl_easy_setopt (curl, CURLOPT_WRITEDATA, auth_request);
 
-		curl_easy_cleanup (curl);
+				result = auth_request_perform (curl, auth_request);
+
+				curl_slist_free_all (headers);
+			}
+
+			curl_easy_cleanup (curl);
+		}
 	}
 
 	return result;

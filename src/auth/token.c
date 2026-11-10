@@ -16,6 +16,8 @@ const char *percepthor_token_type_to_string (const PercepthorTokenType type) {
 
 void percepthor_token_print (const AuthToken *auth_token) {
 
+	if (!auth_token) return;
+
 	(void) printf ("Auth Token:\n");
 
 	(void) printf ("\tid: %s\n", auth_token->id);

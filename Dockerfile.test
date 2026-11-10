@@ -1,0 +1,26 @@
+# syntax=docker/dockerfile:1
+# the test image: cerver from its local sources, built with the same sanitizer as libauth
+# build with --build-context cerver=<path to cerver> (see test/build.sh)
+FROM gcc:16.2
+
+ARG SANITIZER=''
+
+RUN apt-get update && apt-get install -y libssl-dev libcurl4-openssl-dev gdb && apt-get clean
+
+# cerver
+COPY --from=cerver . /opt/cerver
+RUN cd /opt/cerver \
+	&& make clean \
+	&& make TYPE=test SANITIZER=${SANITIZER} -j4 \
+	&& make TYPE=test SANITIZER=${SANITIZER} install \
+	&& make clean \
+	&& ldconfig
+
+WORKDIR /opt/libauth
+
+COPY . .
+RUN make clean && make TYPE=test SANITIZER=${SANITIZER} -j4 && make TYPE=test SANITIZER=${SANITIZER} -j4 test
+
+ENV LD_LIBRARY_PATH=/opt/libauth/bin:/usr/local/lib
+
+CMD ["bash", "test/run.sh"]

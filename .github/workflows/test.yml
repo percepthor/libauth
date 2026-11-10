@@ -1,0 +1,45 @@
+name: LibAuth Tests
+
+on:
+  pull_request:
+    branches:
+      - '*'
+
+env:
+  CERVER_REPOSITORY: ermiry/cerver
+  CERVER_REF: 2.0b-64
+
+jobs:
+  gate:
+    name: LibAuth gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout Cerver
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CERVER_REPOSITORY }}
+          ref: ${{ env.CERVER_REF }}
+          path: .cerver
+
+      - name: Move Cerver out of the workspace
+        run: mv .cerver "${RUNNER_TEMP}/cerver"
+
+      - name: Disable address randomization
+        run: sudo sysctl vm.mmap_rnd_bits=28
+
+      - name: Gate
+        env:
+          CERVER_DIR: ${{ runner.temp }}/cerver
+          SECONDS_PER_TARGET: 30
+        run: bash test/gate.sh
+
+      - name: Upload crashes
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts
+          path: ./fuzz-artifacts/
+          retention-days: 7

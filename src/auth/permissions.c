@@ -22,7 +22,7 @@ PermissionsAction *permissions_action_create (const char *action) {
 
 	PermissionsAction *permissions_action = (PermissionsAction *) malloc (sizeof (PermissionsAction));
 	if (permissions_action) {
-		(void) snprintf (permissions_action->action, AUTH_ACTION_SIZE, "%s", action);
+		(void) snprintf (permissions_action->action, AUTH_ACTION_SIZE, "%s", action ? action : "");
 		permissions_action->action_len = strlen (permissions_action->action);
 	}
 
@@ -65,7 +65,7 @@ void permissions_delete (void *permissions_ptr) {
 
 const char *permissions_get_resource (const Permissions *permissions) {
 
-	return permissions->resource;
+	return permissions ? permissions->resource : NULL;
 
 }
 
@@ -82,10 +82,10 @@ Permissions *permissions_create (void) {
 
 void permissions_print (const Permissions *permissions) {
 
-	if (permissions) {
+	if (permissions && permissions->actions) {
 		(void) printf ("Resource: %s\n", permissions->resource);
 
-		(void) printf ("Actions: %lu\n", permissions->actions->size);
+		(void) printf ("Actions: %zu\n", (size_t) permissions->actions->size);
 
 		ListElement *le = NULL;
 		dlist_for_each (permissions->actions, le) {
@@ -101,14 +101,16 @@ bool permissions_has_action (
 
 	bool result = false;
 
-	ListElement *le = NULL;
-	PermissionsAction *permissions_action = NULL;
-	dlist_for_each (permissions->actions, le) {
-		permissions_action = (PermissionsAction *) le->data;
+	if (permissions && permissions->actions && action) {
+		ListElement *le = NULL;
+		PermissionsAction *permissions_action = NULL;
+		dlist_for_each (permissions->actions, le) {
+			permissions_action = (PermissionsAction *) le->data;
 
-		if (!strcmp (permissions_action->action, action)) {
-			result = true;
-			break;
+			if (!strcmp (permissions_action->action, action)) {
+				result = true;
+				break;
+			}
 		}
 	}
 
