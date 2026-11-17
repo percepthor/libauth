@@ -3,6 +3,13 @@
 The changes of each version that can break code or binaries built with the version before it, the newest first.
 Unlike `CHANGELOG.md`, which only has the current version, every entry stays here.
 
+## 0.5.1 (from 0.5)
+
+- libauth 0.5.1 is built against cerver 2.0b-74, where every header of cerver changed its path (the layout of the
+  3.0): it includes `cerver/http/requests/request.h` and the parts of the other modules, and it does not build
+  against an older cerver; the API of libauth does not change. A program built with libauth 0.5 keeps working with
+  0.5.1 if it is also built against cerver 2.0b-74
+
 ## 0.5 (from 0.4.4)
 
 - libauth needs cerver 2.0 (2.0b-64 or newer): it reads the custom data of the routes and of the cerver with

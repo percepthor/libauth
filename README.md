@@ -9,7 +9,8 @@ the auth service accepts it, the values it answered are kept as the custom data 
 
 | libauth | cerver | Dependencies |
 |---|---|---|
-| 0.5 | 2.0b-64 or newer (the `http` line) | libcurl, pthread |
+| 0.5.1 | 2.0b-74 or newer (the `http` line) | libcurl, pthread |
+| 0.5 | 2.0b-64 to 2.0b-73 (the `http` line) | libcurl, pthread |
 
 The breaking changes of each version are in [incompatibilities.md](incompatibilities.md).
 
